@@ -37,5 +37,16 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    // В разработке клиент и сервер тоже на разных портах, а значит на
+    // разных origin. Прокси делает их одним сайтом — ровно так же, как
+    // в проде это делает статика Render. Иначе локально мы проверяли бы
+    // не то, что работает у игрока.
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8787',
+        changeOrigin: false,
+        rewrite: (path) => path.replace(/^\/api/, ''),
+      },
+    },
   },
 });
