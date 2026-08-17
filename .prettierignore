@@ -1,0 +1,10 @@
+dist/
+dist-types/
+node_modules/
+.localdb/
+pnpm-lock.yaml
+server/drizzle/
+
+# Документы правит человек, не форматтер. Правило 3 из патча 2.0.1:
+# агенты не редактируют GDD. Автоформат markdown-таблиц — это тоже правка.
+docs/

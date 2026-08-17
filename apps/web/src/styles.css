@@ -1,0 +1,187 @@
+/* Мобильный лейаут первичен: проектируем от 380 px вверх (GDD §9).
+   Никаких position: fixed с пиксельными координатами — этим v1.0
+   налезал сам на себя на телефоне. */
+
+:root {
+  --bg: #12100f;
+  --surface: #1c1917;
+  --border: #35302c;
+  --text: #ece7e1;
+  --muted: #9c938a;
+  --accent: #c2683a;
+  --danger: #d4574a;
+  --radius: 10px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.screen {
+  max-width: 34rem;
+  margin: 0 auto;
+  padding: 1.5rem 1rem 3rem;
+}
+
+.screen--auth {
+  display: flex;
+  min-height: 100dvh;
+  align-items: center;
+}
+
+.card {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.5rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.card__title {
+  margin: 0;
+  font-size: 1.375rem;
+  letter-spacing: 0.02em;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.field__label {
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+
+.field__input {
+  padding: 0.7rem 0.75rem;
+  font-size: 1rem;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.field__input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.field__hint,
+.field__error {
+  margin: 0;
+  font-size: 0.8125rem;
+  min-height: 1.2em;
+}
+
+.field__hint {
+  color: var(--muted);
+}
+
+.field__error,
+.form__error {
+  color: var(--danger);
+}
+
+.form__error {
+  margin: 0;
+  font-size: 0.9375rem;
+}
+
+.button {
+  padding: 0.75rem 1rem;
+  font-size: 1rem;
+  font-family: inherit;
+  color: var(--bg);
+  background: var(--accent);
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.button[disabled] {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.button--link,
+.button--ghost {
+  color: var(--muted);
+  background: none;
+  border-color: transparent;
+}
+
+.button--ghost {
+  border-color: var(--border);
+  padding: 0.4rem 0.75rem;
+  font-size: 0.875rem;
+}
+
+.village__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.village__title {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.village__greeting {
+  font-size: 1.125rem;
+  color: var(--accent);
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
+  gap: 0.75rem;
+  margin: 1.5rem 0;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.75rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.stat__label {
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+
+.stat__value {
+  font-size: 1.25rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.village__stub,
+.loading {
+  color: var(--muted);
+}

@@ -1,0 +1,23 @@
+{
+  "name": "@bruteforce/data",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./balance.json": "./balance.json"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "balance.json"
+  ],
+  "scripts": {
+    "build": "tsc --build",
+    "test": "vitest run"
+  }
+}

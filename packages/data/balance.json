@@ -1,0 +1,112 @@
+{
+  "$comment": "Инвариант 5: все коэффициенты баланса живут здесь. Коэффициент, захардкоженный в логике, — это баг. Каждый блок помечен разделом GDD, откуда взят; менять числа здесь, а не в коде.",
+  "version": 1,
+  "gddVersion": "2.0.1",
+
+  "damage": {
+    "$source": "GDD §3.2, пайплайн удара",
+    "atkDivisor": 60,
+    "critMultiplier": 1.8,
+    "mitigation": {
+      "armorConstant": 40,
+      "armorPerAttackerLevel": 12,
+      "cap": 0.75
+    }
+  },
+
+  "dodge": {
+    "$source": "GDD §3.2, clamp(0.03 + (AGI_защ − ACC_атак) × 0.008, 0, 0.30)",
+    "base": 0.03,
+    "perAgiOverAccuracy": 0.008,
+    "min": 0.0,
+    "max": 0.3
+  },
+
+  "crit": {
+    "$source": "GDD §3.2, 0.05 + AGI × 0.004, кап 60%",
+    "base": 0.05,
+    "perAgi": 0.004,
+    "cap": 0.6
+  },
+
+  "block": {
+    "$source": "GDD §3.2, щит.blockChance 15–35%, снижение урона 60–100%",
+    "chanceMin": 0.15,
+    "chanceMax": 0.35,
+    "reductionMin": 0.6,
+    "reductionMax": 1.0
+  },
+
+  "maxHp": {
+    "$source": "GDD §3.2, 60 + DEF × 6 + уровень × 14 + бонусы_путей",
+    "base": 60,
+    "perDef": 6,
+    "perLevel": 14
+  },
+
+  "matchup": {
+    "$source": "GDD §3.3, класс оружия × класс брони",
+    "light": { "cloth": 1.15, "light": 1.1, "medium": 1.0, "heavy": 0.85 },
+    "balanced": { "cloth": 1.0, "light": 1.05, "medium": 1.05, "heavy": 1.0 },
+    "heavy": { "cloth": 0.9, "light": 0.9, "medium": 1.05, "heavy": 1.2 }
+  },
+
+  "progression": {
+    "$source": "GDD §4.2, кап 40, нужно(lv) = 100 × lv^1.35; §4.4 Paragon",
+    "levelCap": 40,
+    "xpCurve": { "coefficient": 100, "exponent": 1.35 },
+    "traitEveryNLevels": 5,
+    "levelUpCardCount": 3,
+    "respecCostPerLevel": 200,
+    "paragonPerPointBonus": 0.004,
+    "paragonChoiceNodeInterval": 25
+  },
+
+  "items": {
+    "$source": "GDD §5.1, базовое_значение = база × (1 + ilvl × 0.04); тиры аффиксов",
+    "ilvlScale": 0.04,
+    "affixTierMinIlvl": { "T5": 1, "T4": 8, "T3": 16, "T2": 25, "T1": 34 },
+    "affixCountByRarity": {
+      "common": [0, 0],
+      "magic": [1, 2],
+      "rare": [3, 4],
+      "epic": [5, 5],
+      "legendary": [4, 4]
+    },
+    "upgrade": {
+      "bonusPerLevel": 0.02,
+      "maxLevel": 10,
+      "riskFreeThrough": 5
+    }
+  },
+
+  "raid": {
+    "$source": "GDD §6.2 и §6.3",
+    "fightsPerRun": 5,
+    "hpRestoreBetweenFights": 0.25,
+    "potionChargesPerRun": 3,
+    "lootMultiplierByFight": [1.0, 1.4, 1.8, 2.5],
+    "goldKeptOnDeath": 0.5,
+    "difficulty": {
+      "normal": { "enemyLevelOffset": -1, "lootMultiplier": 1.0, "legendaryChance": 0.005 },
+      "dangerous": { "enemyLevelOffset": 2, "lootMultiplier": 1.6, "legendaryChance": 0.02 },
+      "nightmare": { "enemyLevelOffset": 5, "lootMultiplier": 2.5, "legendaryChance": 0.06 }
+    }
+  },
+
+  "boss": {
+    "$source": "GDD §6.5",
+    "enrageHpThreshold": 0.3,
+    "enrageDamageBonus": 0.5,
+    "enrageDefensePenalty": 0.2,
+    "heavyStrikeEveryNTicks": 8
+  },
+
+  "arena": {
+    "$source": "GDD §7",
+    "attemptsPerDay": 5,
+    "eloMatchWindow": 150,
+    "seasonLengthDays": 14,
+    "seasonEloReset": { "anchor": 1000, "retainedFraction": 0.4 }
+  }
+}

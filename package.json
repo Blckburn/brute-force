@@ -1,0 +1,41 @@
+{
+  "name": "bruteforce",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.33.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "tsc --build --force",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "build": "pnpm -r --filter \"./packages/*\" build && pnpm --filter @bruteforce/server build && pnpm --filter @bruteforce/web build",
+    "check:bundle": "node scripts/check-bundle.mjs",
+    "db:generate": "pnpm --filter @bruteforce/server db:generate",
+    "db:migrate": "pnpm --filter @bruteforce/server db:migrate",
+    "db:local:up": "bash scripts/local-db.sh up",
+    "db:local:down": "bash scripts/local-db.sh down",
+    "db:local:psql": "bash scripts/local-db.sh psql",
+    "dev": "pnpm --parallel --filter @bruteforce/server --filter @bruteforce/web dev"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.1",
+    "eslint": "^9.39.1",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.6.2",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.46.4",
+    "vitest": "^3.2.4"
+  }
+}

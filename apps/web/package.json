@@ -1,0 +1,21 @@
+{
+  "name": "@bruteforce/web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --build && vite build",
+    "preview": "vite preview",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@bruteforce/shared": "workspace:*",
+    "three": "^0.181.1",
+    "zod": "^4.1.13"
+  },
+  "devDependencies": {
+    "@types/three": "^0.181.0",
+    "vite": "^7.2.4"
+  }
+}

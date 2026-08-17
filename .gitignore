@@ -1,0 +1,20 @@
+# Секреты. Инвариант 7: реальные значения только в переменных окружения.
+.env
+.env.*
+!.env.example
+
+# Зависимости и сборка
+node_modules/
+dist/
+dist-types/
+build/
+*.tsbuildinfo
+
+# Локальная БД для проверки срезов (см. scripts/local-db.sh)
+.localdb/
+
+# Инструменты и мусор ОС
+coverage/
+.vite/
+.DS_Store
+*.log
