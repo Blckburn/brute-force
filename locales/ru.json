@@ -1,6 +1,8 @@
 {
   "app.title": "BRUTEFORCE 3D",
   "app.loading": "Загрузка…",
+  "app.waking": "Сервер просыпается. На бесплатном плане это занимает до минуты",
+  "action.retry": "Попробовать снова",
 
   "auth.signIn.title": "Вход",
   "auth.signUp.title": "Создать персонажа",
