@@ -1,0 +1,333 @@
+import { API_ROUTES } from '@bruteforce/shared';
+import { eq, sql } from 'drizzle-orm';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+
+import { players } from '../db/schema/game.ts';
+import { ensurePlayer, findPlayerByUserId } from '../players/repository.ts';
+import {
+  CookieJar,
+  createTestContext,
+  databaseUrl,
+  get,
+  post,
+  register,
+  unique,
+  type TestContext,
+} from './helpers.ts';
+
+const HAS_DB = databaseUrl() !== undefined;
+const LOADOUT = 'a'.repeat(64);
+
+/**
+ * Интеграционные тесты HTTP-слоя.
+ *
+ * Инвариант 4 говорит: механики без теста не существует. Регистрация —
+ * механика, и до этих тестов её защищала только ручная проверка,
+ * то есть ничего.
+ */
+
+// Без базы тесты пропускаются, но в CI это недопустимо: молча
+// пропущенный тест — это тест, которого нет.
+it('в CI база обязана быть доступна', () => {
+  if (process.env['CI'] === 'true') {
+    expect(HAS_DB, 'DATABASE_URL не задан в CI').toBe(true);
+  }
+});
+
+describe.skipIf(!HAS_DB)('API', () => {
+  let ctx: TestContext;
+
+  beforeAll(async () => {
+    ctx = await createTestContext();
+  }, 60_000);
+
+  afterAll(async () => {
+    await ctx?.close();
+  });
+
+  describe('health', () => {
+    it('отвечает ok, когда БД доступна', async () => {
+      const { status, body } = await get(ctx, API_ROUTES.health);
+      expect(status).toBe(200);
+      expect(body).toEqual({ status: 'ok', database: 'up' });
+    });
+  });
+
+  describe('регистрация', () => {
+    it('создаёт строку в players со стартовыми значениями', async () => {
+      const { status, username } = await register(ctx);
+      expect(status).toBe(200);
+
+      const rows = await ctx.db.select().from(players).where(eq(players.username, username));
+      expect(rows).toHaveLength(1);
+
+      const row = rows[0]!;
+      expect(row.level).toBe(1);
+      expect(row.xp).toBe(0);
+      expect(row.gold).toBe(0);
+      expect(row.paragonPoints).toBe(0);
+      expect(row.elo).toBe(1000);
+      expect(row.founder).toBe(false);
+      expect(row.seasonId).toBeNull();
+    });
+
+    it('отклоняет занятое имя без учёта регистра', async () => {
+      const first = await register(ctx, { username: `Гром${unique()}` });
+      expect(first.status).toBe(200);
+
+      const second = await register(ctx, { username: first.username.toUpperCase() });
+
+      expect(second.status).toBe(409);
+      expect(second.body).toMatchObject({
+        error: {
+          code: 'conflict',
+          messageKey: 'error.field.username.taken',
+          fields: { username: 'error.field.username.taken' },
+        },
+      });
+    });
+
+    it('отклоняет занятую почту', async () => {
+      const first = await register(ctx);
+      expect(first.status).toBe(200);
+
+      const second = await register(ctx, { email: first.email });
+      expect(second.status).toBeGreaterThanOrEqual(400);
+
+      // Учётная запись не задвоилась.
+      const count = await ctx.db
+        .select({ n: sql<number>`count(*)::int` })
+        .from(players)
+        .where(eq(players.username, first.username));
+      expect(count[0]!.n).toBe(1);
+    });
+
+    it('на кривой ввод отдаёт ключи локали, а не текст zod', async () => {
+      const { status, body } = await post(ctx, '/auth/register', {
+        email: 'не почта',
+        password: '123',
+        username: 'ой!',
+      });
+
+      expect(status).toBe(400);
+      expect(body).toMatchObject({
+        error: {
+          code: 'validation_failed',
+          messageKey: 'error.validation_failed',
+          fields: {
+            email: 'error.field.email.invalid',
+            password: 'error.field.password.tooShort',
+            username: 'error.field.username.invalid',
+          },
+        },
+      });
+
+      // Ни одна строка ответа не должна быть английским текстом библиотеки.
+      expect(JSON.stringify(body)).not.toMatch(/Invalid|Too small|expected/);
+    });
+
+    it('не является JSON — 400, а не 500', async () => {
+      const response = await ctx.app.request('/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: 'не json',
+      });
+      expect(response.status).toBe(400);
+    });
+  });
+
+  describe('GET /me', () => {
+    it('без сессии отдаёт 401 в конверте ApiError', async () => {
+      const { status, body } = await get(ctx, API_ROUTES.me);
+
+      expect(status).toBe(401);
+      expect(body).toMatchObject({
+        error: { code: 'unauthorized', messageKey: 'error.unauthorized' },
+      });
+      expect((body as { error: { requestId: string } }).error.requestId).toBeTruthy();
+    });
+
+    it('с сессией отдаёт профиль, прочитанный из БД', async () => {
+      const { jar, username } = await register(ctx);
+      const { status, body } = await get(ctx, API_ROUTES.me, jar);
+
+      expect(status).toBe(200);
+      const player = (body as { player: Record<string, unknown> }).player;
+      expect(player.username).toBe(username);
+      expect(player.level).toBe(1);
+      expect(player.gold).toBe(0);
+    });
+
+    it('после выхода сессия больше не действует', async () => {
+      const { jar } = await register(ctx);
+      expect((await get(ctx, API_ROUTES.me, jar)).status).toBe(200);
+
+      await post(ctx, `${API_ROUTES.auth}/sign-out`, {}, jar);
+
+      expect((await get(ctx, API_ROUTES.me, jar)).status).toBe(401);
+    });
+
+    it('вход по почте и паролю восстанавливает доступ', async () => {
+      const { email, username } = await register(ctx);
+
+      const jar = new CookieJar();
+      const signIn = await post(
+        ctx,
+        `${API_ROUTES.auth}/sign-in/email`,
+        { email, password: 'correct-horse-battery' },
+        jar,
+      );
+      expect(signIn.status).toBe(200);
+
+      const me = await get(ctx, API_ROUTES.me, jar);
+      expect(me.status).toBe(200);
+      expect((me.body as { player: { username: string } }).player.username).toBe(username);
+    });
+  });
+
+  /**
+   * Инвариант 1 — центральный урок v1.0. В той версии золото и предметы
+   * правились из devtools, потому что клиент присылал состояние, а сервер
+   * его записывал. Эти тесты проверяют, что путь закрыт.
+   */
+  describe('инвариант 1: клиент не может изменить своё состояние', () => {
+    it('лишние поля в теле запроса игнорируются, а не записываются', async () => {
+      const { jar, username } = await register(ctx);
+
+      await post(
+        ctx,
+        API_ROUTES.battleStart,
+        {
+          zone: 'wastes',
+          difficulty: 'normal',
+          loadoutHash: LOADOUT,
+          // Ровно то, чем правили состояние в v1.0.
+          gold: 999_999,
+          level: 40,
+          xp: 1_000_000,
+          elo: 9999,
+          founder: true,
+        },
+        jar,
+      );
+
+      const rows = await ctx.db.select().from(players).where(eq(players.username, username));
+      const row = rows[0]!;
+
+      expect(row.gold).toBe(0);
+      expect(row.level).toBe(1);
+      expect(row.xp).toBe(0);
+      expect(row.elo).toBe(1000);
+      expect(row.founder).toBe(false);
+    });
+
+    it('регистрация не даёт задать себе стартовые статы', async () => {
+      const suffix = unique();
+      const username = `Читер${suffix}`;
+
+      await post(ctx, '/auth/register', {
+        email: `cheat-${suffix}@example.com`,
+        password: 'correct-horse-battery',
+        username,
+        gold: 500_000,
+        level: 40,
+        statAtk: 999,
+      });
+
+      const rows = await ctx.db.select().from(players).where(eq(players.username, username));
+      const row = rows[0]!;
+
+      expect(row.gold).toBe(0);
+      expect(row.level).toBe(1);
+      expect(row.statAtk).toBe(5);
+    });
+
+    it('профиль читается по сессии, а не по идентификатору из запроса', async () => {
+      const alice = await register(ctx);
+      const bob = await register(ctx);
+
+      const bobRow = await findPlayerByUserId(
+        ctx.db,
+        (await ctx.db.select().from(players).where(eq(players.username, bob.username)))[0]!.userId,
+      );
+      expect(bobRow).not.toBeNull();
+
+      // Алиса пытается запросить чужой профиль всеми доступными способами.
+      for (const path of [
+        `${API_ROUTES.me}?playerId=${bobRow!.id}`,
+        `${API_ROUTES.me}?userId=${bobRow!.id}`,
+        `${API_ROUTES.me}?username=${encodeURIComponent(bob.username)}`,
+      ]) {
+        const { status, body } = await get(ctx, path, alice.jar);
+        expect(status).toBe(200);
+        // Всегда её собственный профиль: параметры запроса ни на что не влияют.
+        expect((body as { player: { username: string } }).player.username).toBe(alice.username);
+      }
+    });
+  });
+
+  describe('заглушки боя', () => {
+    const cases = [
+      {
+        path: API_ROUTES.battleStart,
+        body: { zone: 'wastes', difficulty: 'normal', loadoutHash: LOADOUT },
+      },
+      {
+        path: API_ROUTES.simulatePreview,
+        body: { zone: 'abyss', difficulty: 'nightmare', loadoutHash: LOADOUT },
+      },
+    ] as const;
+
+    for (const { path, body } of cases) {
+      it(`${path} без сессии — 401`, async () => {
+        const res = await post(ctx, path, body);
+        expect(res.status).toBe(401);
+      });
+
+      it(`${path} с сессией — 501, реализация в M1`, async () => {
+        const { jar } = await register(ctx);
+        const res = await post(ctx, path, body, jar);
+
+        expect(res.status).toBe(501);
+        expect(res.body).toMatchObject({
+          error: { code: 'not_implemented', messageKey: 'error.not_implemented' },
+        });
+      });
+
+      it(`${path} валидирует тело до того, как ответить 501`, async () => {
+        const { jar } = await register(ctx);
+        const res = await post(ctx, path, { zone: 'нет такой зоны', difficulty: 'normal' }, jar);
+
+        expect(res.status).toBe(400);
+        expect(res.body).toMatchObject({ error: { code: 'validation_failed' } });
+      });
+    }
+  });
+
+  describe('прочее', () => {
+    it('несуществующий маршрут — 404 в общем конверте', async () => {
+      const { status, body } = await get(ctx, '/такого-нет');
+      expect(status).toBe(404);
+      expect(body).toMatchObject({ error: { code: 'not_found' } });
+    });
+
+    it('ensurePlayer идемпотентен', async () => {
+      const { username } = await register(ctx);
+      const rows = await ctx.db.select().from(players).where(eq(players.username, username));
+      const { userId } = rows[0]!;
+
+      // Хук уже создал профиль; повторные вызовы не должны ни падать,
+      // ни плодить строки. На этом держится страховка в GET /me.
+      await ensurePlayer(ctx.db, { userId, username });
+      await ensurePlayer(ctx.db, { userId, username });
+
+      const after = await ctx.db.select().from(players).where(eq(players.userId, userId));
+      expect(after).toHaveLength(1);
+    });
+
+    it('в ответе есть сквозной идентификатор запроса', async () => {
+      const response = await ctx.app.request(API_ROUTES.health);
+      expect(response.headers.get('x-request-id')).toBeTruthy();
+    });
+  });
+});
