@@ -1,0 +1,85 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: ['**']
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Значения для проверок, которым нужна валидная конфигурация.
+  # Настоящие секреты живут в переменных окружения Render (инвариант 7).
+  BETTER_AUTH_SECRET: ci-only-secret-value-at-least-32-chars
+  BETTER_AUTH_URL: http://localhost:8787
+
+jobs:
+  check:
+    name: Линт, типы, тесты, сборка
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    # Настоящий Postgres, а не мок: миграции обязаны применяться к живой
+    # базе на каждом PR, иначе поломка схемы найдётся только на деплое.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: bruteforce
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/bruteforce
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Формат
+        run: pnpm format:check
+
+      - name: Линт
+        run: pnpm lint
+
+      - name: Типы
+        run: pnpm typecheck
+
+      - name: Тесты
+        run: pnpm test
+
+      - name: Миграции применяются к чистой базе
+        run: pnpm db:migrate
+
+      - name: Схема в коде совпадает с применённой
+        # Пустой diff означает, что кто-то поменял схему и забыл
+        # сгенерировать миграцию.
+        run: |
+          pnpm db:generate
+          if [ -n "$(git status --porcelain server/drizzle)" ]; then
+            echo "::error::Схема изменена, а миграция не сгенерирована. Запусти pnpm db:generate и закоммить результат."
+            git status --porcelain server/drizzle
+            exit 1
+          fi
+
+      - name: Сборка
+        run: pnpm build
+
+      - name: Движка и секретов нет в клиентском бандле
+        run: pnpm check:bundle

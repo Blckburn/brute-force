@@ -8,6 +8,13 @@
       "when": 1786993329282,
       "tag": "0000_dark_vision",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1786994008555,
+      "tag": "0001_bright_tinkerer",
+      "breakpoints": true
     }
   ]
 }

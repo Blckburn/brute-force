@@ -1,0 +1,79 @@
+# Инфраструктура как код. Разворачивается через Render Blueprint:
+# New -> Blueprint -> указать этот репозиторий.
+#
+# Значения переменных, помеченных sync: false, Render спросит при первом
+# развёртывании. В этом файле их нет и не будет (инвариант 7).
+
+services:
+  # ── Сервер ────────────────────────────────────────────────────────
+  - type: web
+    name: bruteforce-server
+    runtime: node
+    region: frankfurt
+    # ВНИМАНИЕ: free засыпает после 15 минут простоя и просыпается
+    # десятками секунд. Для M0 это принято сознательно; ADR 0001
+    # предполагает starter ($7/мес) — решение об апгрейде отдельное.
+    plan: free
+    branch: main
+
+    buildCommand: pnpm install --frozen-lockfile && pnpm build
+    # Миграции применяются перед стартом: это единственный путь накатить
+    # схему на прод, где у разработчика может не быть доступа к БД.
+    preDeployCommand: pnpm db:migrate
+    startCommand: pnpm --filter @bruteforce/server start
+
+    healthCheckPath: /health
+
+    envVars:
+      - key: NODE_VERSION
+        value: '22'
+      - key: NODE_ENV
+        value: production
+      - key: LOG_LEVEL
+        value: info
+      - key: PORT
+        value: '8787'
+
+      # Pooled-строка Neon (в хосте есть "-pooler"), ADR 0001.
+      - key: DATABASE_URL
+        sync: false
+      # openssl rand -base64 32
+      - key: BETTER_AUTH_SECRET
+        sync: false
+      # Публичный URL этого же сервиса, например
+      # https://bruteforce-server.onrender.com
+      - key: BETTER_AUTH_URL
+        sync: false
+      # Origin клиента, например https://bruteforce-web.onrender.com
+      - key: CORS_ORIGINS
+        sync: false
+
+  # ── Клиент ────────────────────────────────────────────────────────
+  - type: web
+    name: bruteforce-web
+    runtime: static
+    branch: main
+
+    buildCommand: pnpm install --frozen-lockfile && pnpm build
+    staticPublishPath: apps/web/dist
+
+    # Одностраничное приложение: любой путь отдаёт index.html.
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+
+    headers:
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin
+
+    envVars:
+      - key: NODE_VERSION
+        value: '22'
+      # Публичный URL сервера. Попадает в бандл — секретом быть не может.
+      - key: VITE_API_URL
+        sync: false
