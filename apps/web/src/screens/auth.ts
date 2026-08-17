@@ -84,8 +84,13 @@ export function renderAuth(root: HTMLElement, onSignedIn: () => void): void {
       } else if (err instanceof ApiClientError) {
         fieldErrors = err.fields;
         // Better Auth отвечает 401 на неверную пару почта/пароль.
-        formError =
-          err.status === 401 && mode === 'signIn' ? 'error.credentials.invalid' : err.messageKey;
+        // Общую ошибку показываем только если ни одно поле не подсвечено:
+        // иначе «Такое имя уже занято» дублируется под полем и над кнопкой.
+        if (err.status === 401 && mode === 'signIn') {
+          formError = 'error.credentials.invalid';
+        } else if (Object.keys(fieldErrors).length === 0) {
+          formError = err.messageKey;
+        }
       } else {
         formError = 'error.internal';
       }
