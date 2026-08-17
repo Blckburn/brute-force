@@ -22,7 +22,9 @@
     "db:local:up": "bash scripts/local-db.sh up",
     "db:local:down": "bash scripts/local-db.sh down",
     "db:local:psql": "bash scripts/local-db.sh psql",
-    "dev": "pnpm --parallel --filter @bruteforce/server --filter @bruteforce/web dev"
+    "dev": "pnpm --parallel --filter @bruteforce/server --filter @bruteforce/web dev",
+    "assets:build": "node scripts/process-assets.mjs",
+    "assets:check": "node scripts/process-assets.mjs --check"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
@@ -34,6 +36,7 @@
     "eslint": "^9.39.1",
     "eslint-config-prettier": "^10.1.8",
     "prettier": "^3.6.2",
+    "sharp": "^0.35.3",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.46.4",
     "vitest": "^3.2.4"

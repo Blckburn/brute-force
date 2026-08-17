@@ -12,7 +12,8 @@
   "dependencies": {
     "@bruteforce/shared": "workspace:*",
     "three": "^0.181.1",
-    "zod": "^4.1.13"
+    "zod": "^4.1.13",
+    "@bruteforce/data": "workspace:*"
   },
   "devDependencies": {
     "@types/three": "^0.181.0",

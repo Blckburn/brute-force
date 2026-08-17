@@ -3,6 +3,19 @@ import type { PlayerProfile } from '@bruteforce/shared';
 import { api } from '../api.ts';
 import { clear, el } from '../dom.ts';
 import { t } from '../i18n.ts';
+import { renderIcon } from '../ui/icon.ts';
+
+/** GDD §4.3. В M0 показываются только как плейсхолдеры. */
+const EQUIPMENT_SLOTS = [
+  'weapon',
+  'offhand',
+  'helmet',
+  'chest',
+  'bracers',
+  'boots',
+  'amulet',
+  'ring',
+] as const;
 
 /**
  * Заглушка деревни — граница этапа M0.
@@ -48,6 +61,16 @@ export function renderVillage(
         stat('village.stat.gold', player.gold),
         stat('village.stat.elo', player.elo),
       ]),
+
+      // Восемь слотов экипировки — пока только иконки-плейсхолдеры.
+      // Здесь они затем, чтобы система плейсхолдеров была видна, а не
+      // только описана: ни один ассет ещё не нарисован (ART-BIBLE §4).
+      // Инвентарь и надевание предметов — это M3.
+      el(
+        'div',
+        { class: 'slots', 'aria-label': t('village.slots') },
+        EQUIPMENT_SLOTS.map((slot) => renderIcon(`slot.${slot}`, 128, t(`slot.${slot}`))),
+      ),
 
       el('p', { class: 'village__stub' }, [t('village.stub')]),
     ]),

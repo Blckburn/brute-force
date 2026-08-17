@@ -11,3 +11,5 @@ import balanceJson from './balance.json' with { type: 'json' };
 
 export const balance = balanceJson;
 export type Balance = typeof balanceJson;
+
+export * from './assets.ts';
