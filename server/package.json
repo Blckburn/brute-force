@@ -9,6 +9,7 @@
     "start": "node dist/main.js",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "node --env-file-if-exists=../.env src/db/migrate.ts",
+    "db:migrate:dist": "node dist/db/migrate.js",
     "test": "vitest run"
   },
   "dependencies": {

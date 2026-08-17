@@ -17,10 +17,22 @@ services:
     branch: main
 
     buildCommand: pnpm install --frozen-lockfile && pnpm build
-    # Миграции применяются перед стартом: это единственный путь накатить
-    # схему на прод, где у разработчика может не быть доступа к БД.
-    preDeployCommand: pnpm db:migrate
-    startCommand: pnpm --filter @bruteforce/server start
+
+    # Миграции накатываются перед стартом сервера. Правильное место для
+    # этого — preDeployCommand, но он недоступен на плане free, поэтому
+    # миграция стоит первой в startCommand.
+    #
+    # Это безопасно: drizzle ведёт журнал применённых миграций и повторный
+    # запуск ничего не делает, а `&&` не даст серверу подняться, если
+    # схема не накатилась — лучше упасть, чем работать с чужой схемой.
+    #
+    # Цена: на free сервис засыпает, и при каждом пробуждении выполняется
+    # лишний запрос к журналу. При переходе на starter вернуть
+    # preDeployCommand — тогда миграции пойдут один раз за деплой.
+    # Запускается собранный dist, а не исходник: buildCommand его уже
+    # собрал, и в проде незачем полагаться на исполнение TypeScript
+    # напрямую.
+    startCommand: pnpm --filter @bruteforce/server db:migrate:dist && pnpm --filter @bruteforce/server start
 
     healthCheckPath: /health
 
