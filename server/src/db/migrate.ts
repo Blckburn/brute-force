@@ -9,18 +9,32 @@ import { createDatabase } from './client.ts';
  * Применение миграций. Запускается командой `pnpm db:migrate`, а на
  * Render — перед стартом сервера.
  *
+ * Ходит в базу ОТДЕЛЬНОЙ РОЛЬЮ с правами DDL (`MIGRATE_DATABASE_URL`),
+ * а не той, под которой работает сервер. Рантайму DDL не нужен ни для
+ * чего, поэтому у него его и нет — см. server/sql/app-role.sql.
+ *
+ * Если MIGRATE_DATABASE_URL не задан, берётся DATABASE_URL: так работают
+ * локальная разработка и CI, где обе роли — это один суперпользователь
+ * в одноразовой базе.
+ *
  * Идемпотентно: drizzle ведёт таблицу с журналом применённых миграций
  * и пропускает уже накатанные.
  */
 async function main(): Promise<void> {
   const log = createLogger('info', { component: 'migrate' });
 
-  const connectionString = process.env.DATABASE_URL;
+  const migrateUrl = process.env.MIGRATE_DATABASE_URL;
+  const connectionString = migrateUrl ?? process.env.DATABASE_URL;
+
   if (!connectionString) {
-    log.error('DATABASE_URL не задан');
+    log.error('не задан ни MIGRATE_DATABASE_URL, ни DATABASE_URL');
     process.exitCode = 1;
     return;
   }
+
+  log.info('роль для миграций', {
+    source: migrateUrl ? 'MIGRATE_DATABASE_URL' : 'DATABASE_URL (запасной вариант)',
+  });
 
   const { db, pool } = createDatabase(connectionString);
   const migrationsFolder = fileURLToPath(new URL('../../drizzle', import.meta.url));

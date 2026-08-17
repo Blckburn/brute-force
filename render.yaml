@@ -46,8 +46,16 @@ services:
       - key: PORT
         value: '8787'
 
-      # Pooled-строка Neon (в хосте есть "-pooler"), ADR 0001.
+      # Строка РАНТАЙМА: роль bruteforce_app, только работа со строками.
+      # Pooled (в хосте есть "-pooler"), ADR 0001.
+      # Заводится файлом server/sql/app-role.sql.
       - key: DATABASE_URL
+        sync: false
+      # Строка МИГРАЦИЙ: роль-владелец с правами DDL (на Neon это
+      # neondb_owner). Используется только командой db:migrate перед
+      # стартом и больше нигде. Разделение нужно затем, чтобы ошибка
+      # в рантайме не могла снести схему.
+      - key: MIGRATE_DATABASE_URL
         sync: false
       # openssl rand -base64 32
       - key: BETTER_AUTH_SECRET

@@ -96,6 +96,22 @@ export default tseslint.config(
     },
   },
 
+  // probe-invariant-1.js исполняется в консоли браузера, а не в Node.
+  // Глобальные объекты перечислены явно, а не заглушены no-undef: так
+  // опечатка в имени всё ещё будет ошибкой.
+  {
+    files: ['scripts/probe-invariant-1.js'],
+    languageOptions: {
+      globals: {
+        window: 'readonly',
+        document: 'readonly',
+        fetch: 'readonly',
+        prompt: 'readonly',
+        console: 'readonly',
+      },
+    },
+  },
+
   // Скрипты и конфиги сборки исполняются в Node.
   {
     files: ['scripts/**/*.mjs', '*.config.{js,ts}', '**/*.config.{js,ts}'],
