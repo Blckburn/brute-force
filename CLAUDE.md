@@ -110,6 +110,20 @@ pnpm db:local:psql
 pnpm db:local:down
 ```
 
+## Браузер
+
+`.mcp.json` подключает `@playwright/mcp` — headless Chromium внутри среды
+разработки. Нужен, чтобы проверять клиент в настоящем движке: рендер,
+локализацию, лейаут на 390px, сквозной путь регистрации.
+
+Chromium уже в образе (`PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers`).
+**`playwright install` не запускать.**
+
+Чего он не даёт: интерактивного окна для человека. Залогиниться через него
+в Neon или Render нельзя — там headless-процесс, а не экран.
+
+---
+
 **Локальная база нужна не для удобства.** Из этой среды разработки может
 не быть сети до Neon: политика egress закрывает `console.neon.tech`,
 `api.neon.tech`, `api.render.com` и прямой TCP на 5432. Проверить
