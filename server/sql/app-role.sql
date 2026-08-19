@@ -46,6 +46,28 @@ $$;
 -- Роль не должна уметь создавать базы и другие роли.
 ALTER ROLE extramundum_app NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;
 
+-- Роль, заведённая через ИНТЕРФЕЙС Neon, автоматически получает членство
+-- в neon_superuser, а вместе с ним — все права на public. Разделение ролей
+-- при этом не даёт ничего: рантайм снова умеет DDL. NOSUPERUSER выше это
+-- членство не снимает, оно снимается только REVOKE.
+--
+-- Роль, заведённая этим файлом, членства не получает, и блок ничего не
+-- делает. Он здесь ради второго случая: роль уже завели через интерфейс.
+DO $$
+BEGIN
+  IF pg_has_role('extramundum_app', 'neon_superuser', 'MEMBER') THEN
+    EXECUTE 'REVOKE neon_superuser FROM extramundum_app';
+    RAISE NOTICE 'снято членство extramundum_app в neon_superuser';
+  END IF;
+EXCEPTION
+  WHEN undefined_object THEN
+    -- Не Neon (локальный Postgres, CI): роли neon_superuser просто нет.
+    NULL;
+  WHEN insufficient_privilege THEN
+    RAISE NOTICE 'не удалось снять членство в neon_superuser: не хватает прав. Удалите роль в интерфейсе Neon и заведите её этим файлом.';
+END
+$$;
+
 -- 2. Схема public: видеть можно, создавать в ней — нет.
 --    Без CREATE роль не заведёт свою таблицу и не подменит существующую.
 GRANT USAGE ON SCHEMA public TO extramundum_app;
