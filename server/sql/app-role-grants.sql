@@ -58,27 +58,35 @@ BEGIN
 END
 $$;
 
--- 1. Роль, заведённая через ИНТЕРФЕЙС Neon, автоматически получает
---    членство в neon_superuser, а вместе с ним — все права на public.
---    Разделение ролей при этом не даёт ничего: рантайм снова умеет DDL.
+-- 1. Диагностика, ничего не меняющая.
 --
---    Снять членство может только тот, у кого есть ADMIN OPTION на
---    neon_superuser. У владельца базы его может не быть — тогда блок
---    напечатает NOTICE и пойдёт дальше, а самопроверка сервера при
---    старте продолжит сообщать про избыточные права. Это не сбой
---    скрипта, это честный отчёт о том, что хостинг такого не позволяет.
+--    Роль, заведённая через консоль Neon, получает членство в
+--    neon_superuser, а с ним pg_read_all_data и pg_write_all_data.
+--    Снять членство отсюда нельзя: это управление ролями, а на Neon
+--    оно отклоняется (permission denied to alter role) — попытка
+--    завалила бы весь файл. Она живёт в app-role-create.sql, который
+--    на Neon не выполняется.
+--
+--    Что это значит на практике: DDL и TRUNCATE роли всё равно
+--    недоступны — pg_write_all_data даёт только INSERT/UPDATE/DELETE
+--    по строкам. Открытым остаётся журнал миграций, и он закрывается
+--    пунктом 5 ниже.
+--
+--    Блок только печатает, что унаследовано, чтобы это было видно
+--    в выводе, а не выяснялось потом.
 DO $$
+DECLARE inherited text;
 BEGIN
-  IF pg_has_role('extramundum_app', 'neon_superuser', 'MEMBER') THEN
-    EXECUTE 'REVOKE neon_superuser FROM extramundum_app';
-    RAISE NOTICE 'снято членство extramundum_app в neon_superuser';
+  SELECT string_agg(r.rolname, ', ' ORDER BY r.rolname) INTO inherited
+  FROM pg_roles r
+  WHERE r.rolname IN ('neon_superuser', 'pg_read_all_data', 'pg_write_all_data')
+    AND pg_has_role('extramundum_app', r.oid, 'MEMBER');
+
+  IF inherited IS NULL THEN
+    RAISE NOTICE 'extramundum_app не состоит в широких ролях — права заданы только этим файлом';
+  ELSE
+    RAISE NOTICE 'extramundum_app наследует права от: %. Снять их отсюда нельзя, журнал миграций закрывается построчной защитой ниже.', inherited;
   END IF;
-EXCEPTION
-  WHEN undefined_object THEN
-    -- Не Neon (локальный Postgres, CI): роли neon_superuser просто нет.
-    NULL;
-  WHEN insufficient_privilege THEN
-    RAISE NOTICE 'членство extramundum_app в neon_superuser снять не удалось: не хватает прав. Роль сохранит лишние права на public, сервер сообщит об этом в логе старта.';
 END
 $$;
 
@@ -135,13 +143,33 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public
 --    Схемы drizzle нет до первой миграции — на чистой базе блок молчит.
 DO $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'drizzle') THEN
-    REVOKE ALL ON SCHEMA drizzle FROM extramundum_app;
-    REVOKE ALL ON SCHEMA drizzle FROM PUBLIC;
-    REVOKE ALL ON ALL TABLES IN SCHEMA drizzle FROM extramundum_app;
-    REVOKE ALL ON ALL TABLES IN SCHEMA drizzle FROM PUBLIC;
-  ELSE
+  IF NOT EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'drizzle') THEN
     RAISE NOTICE 'схемы drizzle нет: миграции ещё не накатывались. Накатите их и запустите этот файл ещё раз.';
+    RETURN;
+  END IF;
+
+  REVOKE ALL ON SCHEMA drizzle FROM extramundum_app;
+  REVOKE ALL ON SCHEMA drizzle FROM PUBLIC;
+  REVOKE ALL ON ALL TABLES IN SCHEMA drizzle FROM extramundum_app;
+  REVOKE ALL ON ALL TABLES IN SCHEMA drizzle FROM PUBLIC;
+
+  -- REVOKE выше не работает против прав, полученных через членство
+  -- в роли: pg_write_all_data даёт доступ мимо грантов на объект,
+  -- и отозвать его на уровне таблицы нельзя.
+  --
+  -- Зато pg_read_all_data и pg_write_all_data построчную защиту НЕ
+  -- обходят, а владелец таблицы ей не подчиняется, пока не включён
+  -- FORCE. Поэтому RLS без единой политики = «журнал виден и правим
+  -- только владельцу». Мигратор ходит владельцем, ему всё равно.
+  --
+  -- Отсутствие политик здесь не забывчивость, а сам запрет.
+  -- Причина решения — docs/adr/0002-rls-na-zhurnale.md.
+  IF EXISTS (
+    SELECT 1 FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'drizzle' AND c.relname = '__drizzle_migrations'
+  ) THEN
+    ALTER TABLE drizzle.__drizzle_migrations ENABLE ROW LEVEL SECURITY;
   END IF;
 END
 $$;
@@ -158,11 +186,15 @@ $$;
 --   where grantee = 'extramundum_app' and table_schema = 'public'
 --   group by table_name order by table_name;
 
--- Должно вернуть false, false, false. Если may_create = true при
--- is_neon_superuser = true — членство снять не удалось, см. пункт 1:
--- это ограничение хостинга, а не ошибка применения.
+-- may_create и may_write_journal должны быть false. is_neon_superuser
+-- на Neon останется true — это ограничение хостинга, а не ошибка
+-- применения: важно не членство само по себе, а что оно уже никуда
+-- не ведёт.
 --
 --   select
---     has_schema_privilege('extramundum_app', 'public', 'CREATE') as may_create,
---     has_schema_privilege('extramundum_app', 'drizzle', 'USAGE') as sees_migrations,
---     pg_has_role('extramundum_app', 'neon_superuser', 'MEMBER')  as is_neon_superuser;
+--     has_schema_privilege('extramundum_app', 'public', 'CREATE')  as may_create,
+--     has_table_privilege('extramundum_app', 'drizzle.__drizzle_migrations', 'INSERT')
+--       and not (select relrowsecurity
+--                from pg_class
+--                where oid = 'drizzle.__drizzle_migrations'::regclass) as may_write_journal,
+--     pg_has_role('extramundum_app', 'neon_superuser', 'MEMBER')   as is_neon_superuser;
