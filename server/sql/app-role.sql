@@ -5,7 +5,7 @@
 --   ВЛАДЕЛЕЦ (на Neon это neondb_owner) — накатывает миграции. Умеет DDL:
 --   CREATE, ALTER, DROP. Используется ТОЛЬКО командой db:migrate.
 --
---   bruteforce_app — работает в рантайме. Умеет читать и менять СТРОКИ
+--   extramundum_app — работает в рантайме. Умеет читать и менять СТРОКИ
 --   и больше ничего. Используется серверным процессом.
 --
 -- Зачем: ошибка в серверном коде или уязвимость в зависимости не должны
@@ -35,27 +35,27 @@
 -- 1. Роль. CREATE ROLE не имеет IF NOT EXISTS, поэтому через DO-блок.
 DO $$
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'bruteforce_app') THEN
-    CREATE ROLE bruteforce_app WITH LOGIN PASSWORD 'ЗАМЕНИТЕ_МЕНЯ';
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'extramundum_app') THEN
+    CREATE ROLE extramundum_app WITH LOGIN PASSWORD 'ЗАМЕНИТЕ_МЕНЯ';
   ELSE
-    ALTER ROLE bruteforce_app WITH LOGIN PASSWORD 'ЗАМЕНИТЕ_МЕНЯ';
+    ALTER ROLE extramundum_app WITH LOGIN PASSWORD 'ЗАМЕНИТЕ_МЕНЯ';
   END IF;
 END
 $$;
 
 -- Роль не должна уметь создавать базы и другие роли.
-ALTER ROLE bruteforce_app NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;
+ALTER ROLE extramundum_app NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;
 
 -- 2. Схема public: видеть можно, создавать в ней — нет.
 --    Без CREATE роль не заведёт свою таблицу и не подменит существующую.
-GRANT USAGE ON SCHEMA public TO bruteforce_app;
-REVOKE CREATE ON SCHEMA public FROM bruteforce_app;
+GRANT USAGE ON SCHEMA public TO extramundum_app;
+REVOKE CREATE ON SCHEMA public FROM extramundum_app;
 REVOKE CREATE ON SCHEMA public FROM PUBLIC;
 
 -- 3. Ровно те права, которые нужны серверу: работа со строками.
 --    Ни TRUNCATE, ни REFERENCES, ни TRIGGER.
-GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO bruteforce_app;
-GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO bruteforce_app;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO extramundum_app;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO extramundum_app;
 -- ALL TYPES IN SCHEMA не существует как синтаксис, поэтому перебором.
 -- Нужно из-за перечислений (zone, rarity, run_state и прочих).
 DO $$
@@ -67,7 +67,7 @@ BEGIN
     JOIN pg_namespace n ON n.oid = ty.typnamespace
     WHERE n.nspname = 'public' AND ty.typtype = 'e'
   LOOP
-    EXECUTE format('GRANT USAGE ON TYPE %I.%I TO bruteforce_app', t.nspname, t.typname);
+    EXECUTE format('GRANT USAGE ON TYPE %I.%I TO extramundum_app', t.nspname, t.typname);
   END LOOP;
 END
 $$;
@@ -75,18 +75,18 @@ $$;
 -- 4. То же самое для таблиц, которые появятся в следующих миграциях.
 --    Иначе после каждой миграции пришлось бы вспоминать про этот файл.
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
-  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO bruteforce_app;
+  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO extramundum_app;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
-  GRANT USAGE, SELECT ON SEQUENCES TO bruteforce_app;
+  GRANT USAGE, SELECT ON SEQUENCES TO extramundum_app;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
-  GRANT USAGE ON TYPES TO bruteforce_app;
+  GRANT USAGE ON TYPES TO extramundum_app;
 
 -- 5. Журнал миграций закрыт полностью. Рантайм не должен уметь ни читать
 --    его, ни тем более править: переписанный журнал = миграции применятся
 --    заново или не применятся вовсе.
-REVOKE ALL ON SCHEMA drizzle FROM bruteforce_app;
+REVOKE ALL ON SCHEMA drizzle FROM extramundum_app;
 REVOKE ALL ON SCHEMA drizzle FROM PUBLIC;
-REVOKE ALL ON ALL TABLES IN SCHEMA drizzle FROM bruteforce_app;
+REVOKE ALL ON ALL TABLES IN SCHEMA drizzle FROM extramundum_app;
 REVOKE ALL ON ALL TABLES IN SCHEMA drizzle FROM PUBLIC;
 
 -- ─────────────────────────────────────────────────────────────────────
@@ -98,12 +98,12 @@ REVOKE ALL ON ALL TABLES IN SCHEMA drizzle FROM PUBLIC;
 --
 --   select table_name, string_agg(privilege_type, ', ' order by privilege_type)
 --   from information_schema.role_table_grants
---   where grantee = 'bruteforce_app' and table_schema = 'public'
+--   where grantee = 'extramundum_app' and table_schema = 'public'
 --   group by table_name order by table_name;
 
 -- Должно вернуть false, false, false:
 --
 --   select
---     has_schema_privilege('bruteforce_app', 'public', 'CREATE') as may_create,
---     has_schema_privilege('bruteforce_app', 'drizzle', 'USAGE') as sees_migrations,
---     pg_has_role('bruteforce_app', 'neon_superuser', 'MEMBER')  as is_superuser;
+--     has_schema_privilege('extramundum_app', 'public', 'CREATE') as may_create,
+--     has_schema_privilege('extramundum_app', 'drizzle', 'USAGE') as sees_migrations,
+--     pg_has_role('extramundum_app', 'neon_superuser', 'MEMBER')  as is_superuser;

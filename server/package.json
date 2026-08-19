@@ -1,5 +1,5 @@
 {
-  "name": "@bruteforce/server",
+  "name": "@extramundum/server",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -13,9 +13,9 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@bruteforce/data": "workspace:*",
-    "@bruteforce/shared": "workspace:*",
-    "@bruteforce/sim": "workspace:*",
+    "@extramundum/data": "workspace:*",
+    "@extramundum/shared": "workspace:*",
+    "@extramundum/sim": "workspace:*",
     "@hono/node-server": "^1.19.9",
     "better-auth": "^1.4.7",
     "drizzle-orm": "^0.45.2",

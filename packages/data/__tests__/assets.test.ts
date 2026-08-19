@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { ICON_ENTITIES, expectedIconKeys, iconPath, icons } from '../assets.ts';
 
 /**
- * ART-BIBLE §4: «Тест в CI проходит по всем сущностям и падает, если
+ * ART-BIBLE §7: «Тест в CI проходит по всем сущностям и падает, если
  * у чего-то нет иконки или файл отсутствует на диске. Это переводит
  * "не забыли нарисовать" из области памяти в область красной сборки».
  *
@@ -16,7 +16,7 @@ import { ICON_ENTITIES, expectedIconKeys, iconPath, icons } from '../assets.ts';
 /** Куда process-assets.mjs кладёт готовые файлы. */
 const PUBLIC_ASSETS = fileURLToPath(new URL('../../../apps/web/public/assets/', import.meta.url));
 
-const MAX_ICON_BYTES = 20 * 1024; // ART-BIBLE §3
+const MAX_ICON_BYTES = 20 * 1024; // ART-BIBLE §6
 
 describe('манифест иконок', () => {
   it('у каждой сущности есть запись', () => {
@@ -61,7 +61,7 @@ describe('манифест иконок', () => {
       if (size > MAX_ICON_BYTES) heavy.push(`${key}: ${Math.round(size / 1024)} КБ`);
     }
 
-    expect(heavy, 'ART-BIBLE §3: иконка тяжелее 20 КБ').toEqual([]);
+    expect(heavy, 'ART-BIBLE §6: иконка тяжелее 20 КБ').toEqual([]);
   });
 
   it('пути ведут в WebP и в kebab-case латиницей', () => {
@@ -75,11 +75,11 @@ describe('манифест иконок', () => {
         wrong.push(`${key}: путь должен быть относительным`);
     }
 
-    expect(wrong, 'ART-BIBLE §3, именование').toEqual([]);
+    expect(wrong, 'ART-BIBLE §6, именование').toEqual([]);
   });
 
   it('игра собирается при нуле готовых иконок', () => {
-    // Ключевое требование ART-BIBLE §4. Отсутствие иконки не должно быть
+    // Ключевое требование ART-BIBLE §7. Отсутствие иконки не должно быть
     // ошибкой — на её месте рисуется плейсхолдер.
     for (const key of expectedIconKeys()) {
       expect(() => iconPath(key)).not.toThrow();

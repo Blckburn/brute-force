@@ -7,7 +7,7 @@ import { usernameSchema } from './auth.js';
  *
  * Важно: сервер собирает это, читая строку из БД по сессии. Клиент
  * не присылает ни одного из этих полей и не может на них повлиять
- * (инвариант 1). Список полей — GDD §2.3, таблица players.
+ * (инвариант 1). Список полей — GDD §3.3, таблица players.
  */
 export const playerProfileSchema = z.object({
   id: z.uuid(),
@@ -27,7 +27,12 @@ export const playerProfileSchema = z.object({
   hpCurrent: z.int().min(0),
   elo: z.int().min(0),
   seasonId: z.int().min(0).nullable(),
-  founder: z.boolean(),
+
+  /**
+   * Номер в книге покойников. LORE §2, GDD §1.
+   * Выдаётся последовательностью в БД, монотонен, не переиспользуется.
+   */
+  exileNumber: z.int().min(1),
 });
 
 export type PlayerProfile = z.infer<typeof playerProfileSchema>;

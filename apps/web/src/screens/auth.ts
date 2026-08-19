@@ -1,4 +1,4 @@
-import { signInInputSchema, signUpInputSchema, fieldErrorKeys } from '@bruteforce/shared';
+import { signInInputSchema, signUpInputSchema, fieldErrorKeys } from '@extramundum/shared';
 import { ZodError } from 'zod';
 
 import { api, ApiClientError } from '../api.ts';
@@ -10,7 +10,7 @@ type Mode = 'signIn' | 'signUp';
 /**
  * Экран входа и регистрации.
  *
- * Валидация идёт теми же схемами, что и на сервере (@bruteforce/shared):
+ * Валидация идёт теми же схемами, что и на сервере (@extramundum/shared):
  * клиентская проверка нужна только чтобы не гонять заведомо кривой запрос
  * по сети. Настоящая проверка — на сервере, и она не отключается.
  */

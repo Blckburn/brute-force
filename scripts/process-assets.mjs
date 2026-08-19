@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Постобработка иконок. ART-BIBLE §3 и §5.
+ * Постобработка иконок. ART-BIBLE §6 и §8.
  *
  * Берёт исходные PNG из assets-src/, приводит к продакшн-виду и кладёт
  * в apps/web/public/assets/. Пути готовых файлов сам вписывает
@@ -35,7 +35,7 @@ const SRC = join(ROOT, 'assets-src');
 const OUT = join(ROOT, 'apps/web/public/assets/icons');
 const MANIFEST = join(ROOT, 'packages/data/assets.json');
 
-/** ART-BIBLE §3. */
+/** ART-BIBLE §6. */
 const SOURCE_SIZE = 1024;
 const SIZES = [256, 128];
 const MAX_BYTES = 20 * 1024;
@@ -100,7 +100,7 @@ async function processOne({ full, prefix }) {
     return null;
   }
   if (!/^[a-z0-9-]+$/.test(id)) {
-    problems.push(`${rel}: имя файла должно быть kebab-case латиницей (ART-BIBLE §3)`);
+    problems.push(`${rel}: имя файла должно быть kebab-case латиницей (ART-BIBLE §6)`);
     return null;
   }
 
@@ -118,7 +118,7 @@ async function processOne({ full, prefix }) {
     return null;
   }
   if (!meta.hasAlpha) {
-    problems.push(`${rel}: нет альфа-канала, фон обязан быть прозрачным (ART-BIBLE §3)`);
+    problems.push(`${rel}: нет альфа-канала, фон обязан быть прозрачным (ART-BIBLE §6)`);
     return null;
   }
   if (!(await cornersAreTransparent(image))) {
@@ -169,7 +169,7 @@ const sources = await listSources(SRC);
 if (sources.length === 0) {
   console.log(`В ${relative(ROOT, SRC)}/ нет ни одного PNG.`);
   console.log('Это нормальное состояние: игра собирается с нулём иконок,');
-  console.log('на их месте рисуются плейсхолдеры (ART-BIBLE §4).');
+  console.log('на их месте рисуются плейсхолдеры (ART-BIBLE §7).');
   process.exit(0);
 }
 
@@ -197,7 +197,7 @@ if (problems.length > 0) {
   console.error(`\nОтклонено (${problems.length}):`);
   for (const p of problems) console.error(`  ${p}`);
   console.error(
-    '\nART-BIBLE §3: не опознаётся в 48px или не проходит проверки — ассет не принимается.',
+    '\nART-BIBLE §6: не опознаётся в 48px или не проходит проверки — ассет не принимается.',
   );
   process.exit(1);
 }

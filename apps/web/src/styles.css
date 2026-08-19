@@ -1,4 +1,4 @@
-/* Мобильный лейаут первичен: проектируем от 380 px вверх (GDD §9).
+/* Мобильный лейаут первичен: проектируем от 380 px вверх (GDD §10).
    Никаких position: fixed с пиксельными координатами — этим v1.0
    налезал сам на себя на телефоне. */
 
@@ -186,7 +186,7 @@ body {
   color: var(--muted);
 }
 
-/* Иконки и плейсхолдеры под них. ART-BIBLE §4. */
+/* Иконки и плейсхолдеры под них. ART-BIBLE §7. */
 .icon {
   display: inline-block;
   border-radius: calc(var(--radius) / 2);
@@ -199,9 +199,12 @@ body {
   justify-content: center;
   font-weight: 700;
   line-height: 1;
-  color: hsl(var(--icon-hue) 30% 12%);
-  background: hsl(var(--icon-hue) 45% 55%);
-  border: 1px solid hsl(var(--icon-hue) 45% 35%);
+  /* ART-BIBLE §7: тёмный квадрат с первой буквой типа. Оттенок выводится
+     из ключа, но светлота низкая — палитра документа (§3) держится на
+     чернильной тени и приглушённом металле, яркие плашки из неё выпадают. */
+  color: hsl(var(--icon-hue) 35% 72%);
+  background: hsl(var(--icon-hue) 25% 16%);
+  border: 1px solid hsl(var(--icon-hue) 25% 30%);
   user-select: none;
 }
 
@@ -216,4 +219,11 @@ body {
   width: 3rem;
   height: 3rem;
   font-size: 1.35rem;
+}
+
+.village__exile-number {
+  margin-left: 0.5rem;
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
 }

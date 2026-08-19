@@ -35,10 +35,10 @@ importers:
 
   apps/web:
     dependencies:
-      '@bruteforce/data':
+      '@extramundum/data':
         specifier: workspace:*
         version: link:../../packages/data
-      '@bruteforce/shared':
+      '@extramundum/shared':
         specifier: workspace:*
         version: link:../../packages/shared
       three:
@@ -57,7 +57,7 @@ importers:
 
   packages/data:
     dependencies:
-      '@bruteforce/shared':
+      '@extramundum/shared':
         specifier: workspace:*
         version: link:../shared
 
@@ -71,13 +71,13 @@ importers:
 
   server:
     dependencies:
-      '@bruteforce/data':
+      '@extramundum/data':
         specifier: workspace:*
         version: link:../packages/data
-      '@bruteforce/shared':
+      '@extramundum/shared':
         specifier: workspace:*
         version: link:../packages/shared
-      '@bruteforce/sim':
+      '@extramundum/sim':
         specifier: workspace:*
         version: link:../packages/sim
       '@hono/node-server':

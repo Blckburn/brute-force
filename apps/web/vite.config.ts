@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
 
 /**
- * Инвариант 3: @bruteforce/sim не попадает в браузерный бандл.
+ * Инвариант 3: @extramundum/sim не попадает в браузерный бандл.
  *
  * Здесь стоит третий рубеж защиты (первый — правило ESLint, второй —
  * отсутствие sim в зависимостях apps/web): если движок всё-таки окажется
@@ -13,12 +13,12 @@ import { defineConfig } from 'vite';
  */
 function forbidSimImport() {
   return {
-    name: 'bruteforce:forbid-sim-import',
+    name: 'extramundum:forbid-sim-import',
     resolveId(source: string, importer: string | undefined) {
-      if (source === '@bruteforce/sim' || source.startsWith('@bruteforce/sim/')) {
+      if (source === '@extramundum/sim' || source.startsWith('@extramundum/sim/')) {
         throw new Error(
           `Инвариант 3 нарушен: ${importer ?? 'клиент'} импортирует ${source}.\n` +
-            'Боевой движок исполняется только на сервере (GDD §2.1).\n' +
+            'Боевой движок исполняется только на сервере (GDD §3.1).\n' +
             'Превью шансов победы получают эндпоинтом POST /simulate/preview.',
         );
       }

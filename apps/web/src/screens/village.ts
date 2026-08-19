@@ -1,11 +1,11 @@
-import type { PlayerProfile } from '@bruteforce/shared';
+import type { PlayerProfile } from '@extramundum/shared';
 
 import { api } from '../api.ts';
 import { clear, el } from '../dom.ts';
 import { t } from '../i18n.ts';
 import { renderIcon } from '../ui/icon.ts';
 
-/** GDD §4.3. В M0 показываются только как плейсхолдеры. */
+/** GDD §5.3. В M0 показываются только как плейсхолдеры. */
 const EQUIPMENT_SLOTS = [
   'weapon',
   'offhand',
@@ -21,7 +21,7 @@ const EQUIPMENT_SLOTS = [
  * Заглушка деревни — граница этапа M0.
  *
  * Показывает то, что сервер прочитал из БД по сессии, и ничего больше.
- * Кузнец, лавка, инвентарь и вход в рейд — это M3 (GDD §10).
+ * Кузнец, лавка, инвентарь и вход в рейд — это M3 (GDD §11).
  */
 export function renderVillage(
   root: HTMLElement,
@@ -53,6 +53,11 @@ export function renderVillage(
       // Имя приходит из БД и вставляется текстовым узлом, не разметкой.
       el('p', { class: 'village__greeting' }, [
         t('village.greeting', { username: player.username }),
+        // Номер в книге покойников (LORE §2). Показывается рядом с именем:
+        // снаружи им представляются, и по нему видно стаж.
+        el('span', { class: 'village__exile-number', title: t('village.exileNumber') }, [
+          `#${player.exileNumber}`,
+        ]),
       ]),
 
       el('div', { class: 'stats' }, [
@@ -64,7 +69,7 @@ export function renderVillage(
 
       // Восемь слотов экипировки — пока только иконки-плейсхолдеры.
       // Здесь они затем, чтобы система плейсхолдеров была видна, а не
-      // только описана: ни один ассет ещё не нарисован (ART-BIBLE §4).
+      // только описана: ни один ассет ещё не нарисован (ART-BIBLE §7).
       // Инвентарь и надевание предметов — это M3.
       el(
         'div',

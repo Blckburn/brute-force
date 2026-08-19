@@ -1,11 +1,11 @@
-import { DIFFICULTIES, ZONE_IDS } from '@bruteforce/shared';
+import { DIFFICULTIES, ZONE_IDS } from '@extramundum/shared';
 import { describe, expect, it } from 'vitest';
 
 import { difficultyEnum, zoneEnum } from '../schema/enums.ts';
 import * as schema from '../schema/index.ts';
 
 /**
- * Перечисления существуют в двух местах: в @bruteforce/shared (контракт
+ * Перечисления существуют в двух местах: в @extramundum/shared (контракт
  * с клиентом) и в схеме БД. Дублирование вынужденное — тянуть схему БД
  * в браузерный пакет нельзя. Значит нужен тест, который ловит расхождение:
  * иначе однажды в GDD добавят зону, её пропишут в одном месте, и запрос
@@ -20,7 +20,7 @@ describe('схема БД', () => {
     expect([...difficultyEnum.enumValues].sort()).toEqual([...DIFFICULTIES].sort());
   });
 
-  it('присутствуют все таблицы из GDD §2.3', () => {
+  it('присутствуют все таблицы из GDD §3.3', () => {
     const required = [
       'players',
       'playerTraits',

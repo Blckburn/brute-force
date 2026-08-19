@@ -1,5 +1,5 @@
 {
-  "name": "bruteforce",
+  "name": "extramundum",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -15,16 +15,17 @@
     "typecheck": "tsc --build --force",
     "test": "vitest run",
     "test:watch": "vitest",
-    "build": "pnpm -r --filter \"./packages/*\" build && pnpm --filter @bruteforce/server build && pnpm --filter @bruteforce/web build",
+    "build": "pnpm -r --filter \"./packages/*\" build && pnpm --filter @extramundum/server build && pnpm --filter @extramundum/web build",
     "check:bundle": "node scripts/check-bundle.mjs",
-    "db:generate": "pnpm --filter @bruteforce/server db:generate",
-    "db:migrate": "pnpm --filter @bruteforce/server db:migrate",
+    "db:generate": "pnpm --filter @extramundum/server db:generate",
+    "db:migrate": "pnpm --filter @extramundum/server db:migrate",
     "db:local:up": "bash scripts/local-db.sh up",
     "db:local:down": "bash scripts/local-db.sh down",
     "db:local:psql": "bash scripts/local-db.sh psql",
-    "dev": "pnpm --parallel --filter @bruteforce/server --filter @bruteforce/web dev",
+    "dev": "pnpm --parallel --filter @extramundum/server --filter @extramundum/web dev",
     "assets:build": "node scripts/process-assets.mjs",
-    "assets:check": "node scripts/process-assets.mjs --check"
+    "assets:check": "node scripts/process-assets.mjs --check",
+    "check:docs": "node scripts/check-doc-refs.mjs"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

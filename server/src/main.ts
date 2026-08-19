@@ -7,7 +7,7 @@ import { reportRuntimePrivileges } from './db/privileges.ts';
 import { createLogger } from './logger.ts';
 
 const config = loadConfig();
-const log = createLogger(config.LOG_LEVEL, { service: 'bruteforce-server' });
+const log = createLogger(config.LOG_LEVEL, { service: 'extramundum-server' });
 const { db, pool } = createDatabase(config.DATABASE_URL);
 
 const server = serve({ fetch: createApp(db, config, log).fetch, port: config.PORT }, (info) => {

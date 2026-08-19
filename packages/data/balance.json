@@ -4,7 +4,7 @@
   "gddVersion": "2.0.1",
 
   "damage": {
-    "$source": "GDD §3.2, пайплайн удара",
+    "$source": "GDD §4.2, пайплайн удара",
     "atkDivisor": 60,
     "critMultiplier": 1.8,
     "mitigation": {
@@ -15,7 +15,7 @@
   },
 
   "dodge": {
-    "$source": "GDD §3.2, clamp(0.03 + (AGI_защ − ACC_атак) × 0.008, 0, 0.30)",
+    "$source": "GDD §4.2, clamp(0.03 + (AGI_защ − ACC_атак) × 0.008, 0, 0.30)",
     "base": 0.03,
     "perAgiOverAccuracy": 0.008,
     "min": 0.0,
@@ -23,14 +23,14 @@
   },
 
   "crit": {
-    "$source": "GDD §3.2, 0.05 + AGI × 0.004, кап 60%",
+    "$source": "GDD §4.2, 0.05 + AGI × 0.004, кап 60%",
     "base": 0.05,
     "perAgi": 0.004,
     "cap": 0.6
   },
 
   "block": {
-    "$source": "GDD §3.2, щит.blockChance 15–35%, снижение урона 60–100%",
+    "$source": "GDD §4.2, щит.blockChance 15–35%, снижение урона 60–100%",
     "chanceMin": 0.15,
     "chanceMax": 0.35,
     "reductionMin": 0.6,
@@ -38,21 +38,21 @@
   },
 
   "maxHp": {
-    "$source": "GDD §3.2, 60 + DEF × 6 + уровень × 14 + бонусы_путей",
+    "$source": "GDD §4.2, 60 + DEF × 6 + уровень × 14 + бонусы_путей",
     "base": 60,
     "perDef": 6,
     "perLevel": 14
   },
 
   "matchup": {
-    "$source": "GDD §3.3, класс оружия × класс брони",
+    "$source": "GDD §4.3, класс оружия × класс брони",
     "light": { "cloth": 1.15, "light": 1.1, "medium": 1.0, "heavy": 0.85 },
     "balanced": { "cloth": 1.0, "light": 1.05, "medium": 1.05, "heavy": 1.0 },
     "heavy": { "cloth": 0.9, "light": 0.9, "medium": 1.05, "heavy": 1.2 }
   },
 
   "progression": {
-    "$source": "GDD §4.2, кап 40, нужно(lv) = 100 × lv^1.35; §4.4 Paragon",
+    "$source": "GDD §5.2, кап 40, нужно(lv) = 100 × lv^1.35; §5.4 Paragon",
     "levelCap": 40,
     "xpCurve": { "coefficient": 100, "exponent": 1.35 },
     "traitEveryNLevels": 5,
@@ -63,7 +63,7 @@
   },
 
   "items": {
-    "$source": "GDD §5.1, базовое_значение = база × (1 + ilvl × 0.04); тиры аффиксов",
+    "$source": "GDD §6.1, базовое_значение = база × (1 + ilvl × 0.04); тиры аффиксов",
     "ilvlScale": 0.04,
     "affixTierMinIlvl": { "T5": 1, "T4": 8, "T3": 16, "T2": 25, "T1": 34 },
     "affixCountByRarity": {
@@ -81,7 +81,7 @@
   },
 
   "raid": {
-    "$source": "GDD §6.2 и §6.3",
+    "$source": "GDD §7.2 и §7.3",
     "fightsPerRun": 5,
     "hpRestoreBetweenFights": 0.25,
     "potionChargesPerRun": 3,
@@ -95,7 +95,7 @@
   },
 
   "boss": {
-    "$source": "GDD §6.5",
+    "$source": "GDD §7.5",
     "enrageHpThreshold": 0.3,
     "enrageDamageBonus": 0.5,
     "enrageDefensePenalty": 0.2,
@@ -103,7 +103,7 @@
   },
 
   "arena": {
-    "$source": "GDD §7",
+    "$source": "GDD §8",
     "attemptsPerDay": 5,
     "eloMatchWindow": 150,
     "seasonLengthDays": 14,

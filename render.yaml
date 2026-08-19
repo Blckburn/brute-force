@@ -7,7 +7,7 @@
 services:
   # ── Сервер ────────────────────────────────────────────────────────
   - type: web
-    name: bruteforce-server
+    name: extramundum-server
     runtime: node
     region: frankfurt
     # ВНИМАНИЕ: free засыпает после 15 минут простоя и просыпается
@@ -32,7 +32,7 @@ services:
     # Запускается собранный dist, а не исходник: buildCommand его уже
     # собрал, и в проде незачем полагаться на исполнение TypeScript
     # напрямую.
-    startCommand: pnpm --filter @bruteforce/server db:migrate:dist && pnpm --filter @bruteforce/server start
+    startCommand: pnpm --filter @extramundum/server db:migrate:dist && pnpm --filter @extramundum/server start
 
     healthCheckPath: /health
 
@@ -46,7 +46,7 @@ services:
       - key: PORT
         value: '8787'
 
-      # Строка РАНТАЙМА: роль bruteforce_app, только работа со строками.
+      # Строка РАНТАЙМА: роль extramundum_app, только работа со строками.
       # Pooled (в хосте есть "-pooler"), ADR 0001.
       # Заводится файлом server/sql/app-role.sql.
       - key: DATABASE_URL
@@ -63,10 +63,10 @@ services:
       # Публичный адрес, по которому браузер видит эндпоинты авторизации.
       # Теперь это ДОМЕН КЛИЕНТА плюс /api, потому что запросы идут через
       # прокси статики, а не напрямую на сервер:
-      #   https://bruteforce-web.onrender.com/api
+      #   https://extramundum-web.onrender.com/api
       - key: BETTER_AUTH_URL
         sync: false
-      # Origin клиента, например https://bruteforce-web.onrender.com.
+      # Origin клиента, например https://extramundum-web.onrender.com.
       # После перехода на прокси браузер шлёт запросы на свой же домен,
       # так что CORS для него не нужен. Оставлено на случай обращений
       # к серверу напрямую (проверка /health руками, отладка).
@@ -75,7 +75,7 @@ services:
 
   # ── Клиент ────────────────────────────────────────────────────────
   - type: web
-    name: bruteforce-web
+    name: extramundum-web
     runtime: static
     branch: main
 
@@ -95,7 +95,7 @@ services:
       # сервиса в destination. Если сервис переименуют, поправить тут.
       - type: rewrite
         source: /api/*
-        destination: https://bruteforce-server.onrender.com/*
+        destination: https://extramundum-server.onrender.com/*
 
       # Одностраничное приложение: всё остальное отдаёт index.html.
       - type: rewrite

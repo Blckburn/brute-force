@@ -79,6 +79,6 @@ export async function reportRuntimePrivileges(
     mayCreateInPublic: privileges.mayCreateInPublic,
     seesMigrationJournal: privileges.seesMigrationJournal,
     isSuperuser: privileges.isSuperuser,
-    fix: 'server/sql/app-role.sql — завести bruteforce_app и указать её в DATABASE_URL',
+    fix: 'server/sql/app-role.sql — завести extramundum_app и указать её в DATABASE_URL',
   });
 }

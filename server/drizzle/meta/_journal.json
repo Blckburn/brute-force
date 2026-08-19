@@ -15,6 +15,20 @@
       "when": 1786994008555,
       "tag": "0001_bright_tinkerer",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1787153430956,
+      "tag": "0002_sturdy_shaman",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1787153474552,
+      "tag": "0003_closed_sharon_ventura",
+      "breakpoints": true
     }
   ]
 }

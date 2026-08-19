@@ -4,7 +4,7 @@ import { getLocale, setLocale, t } from './i18n.ts';
 import { renderAuth } from './screens/auth.ts';
 import { renderVillage } from './screens/village.ts';
 
-import type { MeResponse } from '@bruteforce/shared';
+import type { MeResponse } from '@extramundum/shared';
 
 const root = document.querySelector<HTMLElement>('#app');
 if (root === null) throw new Error('#app не найден');

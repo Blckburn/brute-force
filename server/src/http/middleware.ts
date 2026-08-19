@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-import { fieldErrorKeys, type ApiError } from '@bruteforce/shared';
+import { fieldErrorKeys, type ApiError } from '@extramundum/shared';
 import type { Context, ErrorHandler, MiddlewareHandler } from 'hono';
 import { ZodError, type ZodType } from 'zod';
 
@@ -77,7 +77,7 @@ export function errorHandler(): ErrorHandler<AppEnv> {
 }
 
 /**
- * Валидация тела запроса схемой из @bruteforce/shared.
+ * Валидация тела запроса схемой из @extramundum/shared.
  *
  * Инвариант: ни один обработчик не читает `await c.req.json()` напрямую.
  * Всё, что приходит снаружи, проходит здесь.

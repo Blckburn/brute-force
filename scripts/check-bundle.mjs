@@ -3,7 +3,7 @@
  * Инвариант 3: packages/sim не попадает в браузерный бандл.
  *
  * Это последний рубеж из четырёх. Предыдущие три — правило ESLint,
- * отсутствие @bruteforce/sim в зависимостях apps/web и плагин Vite,
+ * отсутствие @extramundum/sim в зависимостях apps/web и плагин Vite,
  * падающий на резолве. Здесь мы смотрим уже на СОБРАННЫЕ файлы, потому
  * что только они реально уезжают в браузер. Правило можно отключить
  * комментарием, зависимость — добавить, плагин — убрать; собранный
@@ -21,8 +21,8 @@ const DIST = fileURLToPath(new URL('../apps/web/dist', import.meta.url));
 /** Что искать -> почему это провал. */
 const FORBIDDEN = [
   {
-    pattern: 'BRUTEFORCE_SIM_MUST_NEVER_REACH_THE_BROWSER',
-    reason: 'боевой движок @bruteforce/sim оказался в клиентском бандле (GDD §2.1, инвариант 3)',
+    pattern: 'EXTRAMUNDUM_SIM_MUST_NEVER_REACH_THE_BROWSER',
+    reason: 'боевой движок @extramundum/sim оказался в клиентском бандле (GDD §3.1, инвариант 3)',
   },
   {
     pattern: 'postgres://',

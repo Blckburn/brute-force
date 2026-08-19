@@ -55,7 +55,7 @@ export default tseslint.config(
               message: 'packages/sim не делает I/O (инвариант 2).',
             },
             {
-              group: ['@bruteforce/*'],
+              group: ['@extramundum/*'],
               message: 'packages/sim не зависит ни от чего (инвариант 2).',
             },
           ],
@@ -76,7 +76,7 @@ export default tseslint.config(
         {
           patterns: [
             {
-              group: ['@bruteforce/sim', '@bruteforce/sim/*', '**/packages/sim/**'],
+              group: ['@extramundum/sim', '@extramundum/sim/*', '**/packages/sim/**'],
               message:
                 'Инвариант 3: боевой движок живёт только на сервере. Превью — через POST /simulate/preview.',
             },

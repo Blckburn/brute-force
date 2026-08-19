@@ -19,7 +19,7 @@ PGBIN="${PGBIN:-/usr/lib/postgresql/16/bin}"
 PGDATA="$ROOT/.localdb/data"
 SOCKET_DIR="$ROOT/.localdb/socket"
 LOGFILE="$ROOT/.localdb/postgres.log"
-DBNAME="${LOCAL_PG_DB:-bruteforce}"
+DBNAME="${LOCAL_PG_DB:-extramundum}"
 PORT="${LOCAL_PG_PORT:-55432}"
 RUN_AS="${LOCAL_PG_USER:-ubuntu}"
 

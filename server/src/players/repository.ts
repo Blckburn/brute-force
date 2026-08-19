@@ -1,4 +1,4 @@
-import type { PlayerProfile } from '@bruteforce/shared';
+import type { PlayerProfile } from '@extramundum/shared';
 import { eq, sql } from 'drizzle-orm';
 
 import type { Database } from '../db/client.ts';
@@ -64,6 +64,6 @@ function toProfile(row: typeof players.$inferSelect): PlayerProfile {
     hpCurrent: row.hpCurrent,
     elo: row.elo,
     seasonId: row.seasonId,
-    founder: row.founder,
+    exileNumber: row.exileNumber,
   };
 }

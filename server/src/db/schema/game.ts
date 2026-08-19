@@ -1,19 +1,10 @@
 import { sql } from 'drizzle-orm';
-import {
-  boolean,
-  check,
-  integer,
-  pgTable,
-  text,
-  timestamp,
-  uniqueIndex,
-  uuid,
-} from 'drizzle-orm/pg-core';
+import { check, integer, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
 
 import { user } from './auth.ts';
 
 /**
- * players — игровой профиль. GDD §2.3.
+ * players — игровой профиль. GDD §3.3.
  *
  * Инвариант 1: строки этой таблицы правит только сервер. Клиент не имеет
  * ни роли в БД, ни строки подключения, ни эндпоинта, принимающего эти
@@ -47,7 +38,7 @@ export const players = pgTable(
     statSpd: integer('stat_spd').notNull().default(5),
 
     /**
-     * Максимум HP не хранится: он считается по формуле GDD §3.2 из DEF,
+     * Максимум HP не хранится: он считается по формуле GDD §4.2 из DEF,
      * уровня и бонусов путей. Хранить оба числа значит однажды их
      * рассинхронизировать — ровно баг №2 из аудита v1.0.
      */
@@ -56,8 +47,20 @@ export const players = pgTable(
     elo: integer('elo').notNull().default(1000),
     seasonId: integer('season_id'),
 
-    /** Титул для аккаунтов из v1.0. GDD §10, раздел о миграции. */
-    founder: boolean('founder').notNull().default(false),
+    /**
+     * Номер в книге покойников. LORE §2, GDD §1.
+     *
+     * Город записывает изгнанного в тот же журнал, что и умерших, и номер
+     * остаётся при человеке снаружи. Маленький номер значит, что человек
+     * снаружи давно и выжил, поэтому номер обязан быть монотонным и
+     * никогда не переиспользоваться.
+     *
+     * GENERATED ALWAYS AS IDENTITY, а не `SELECT MAX + 1`: выдача идёт
+     * последовательностью внутри БД и атомарна. Две одновременные
+     * регистрации не могут получить один номер, и вставить его извне
+     * нельзя даже из серверного кода — Postgres запретит.
+     */
+    exileNumber: integer('exile_number').generatedAlwaysAsIdentity().notNull().unique(),
   },
   (table) => [
     // Имя уникально без учёта регистра: «Гром» и «гром» — один игрок.

@@ -1,4 +1,4 @@
-import { API_ROUTES, PASSWORD_MAX, PASSWORD_MIN } from '@bruteforce/shared';
+import { API_ROUTES, PASSWORD_MAX, PASSWORD_MIN } from '@extramundum/shared';
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 
@@ -16,7 +16,7 @@ export type Auth = ReturnType<typeof createAuth>;
  */
 export function createAuth(db: Database, config: Config, log: Logger) {
   return betterAuth({
-    appName: 'bruteforce',
+    appName: 'extramundum',
     secret: config.BETTER_AUTH_SECRET,
     baseURL: config.BETTER_AUTH_URL,
     basePath: API_ROUTES.auth,

@@ -6,7 +6,7 @@ import {
   type MeResponse,
   type SignInInput,
   type SignUpInput,
-} from '@bruteforce/shared';
+} from '@extramundum/shared';
 
 /**
  * Типизированный клиент API.

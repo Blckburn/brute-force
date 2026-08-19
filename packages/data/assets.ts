@@ -1,9 +1,9 @@
-import { ZONE_IDS } from '@bruteforce/shared';
+import { ZONE_IDS } from '@extramundum/shared';
 
 import manifest from './assets.json' with { type: 'json' };
 
 /**
- * Манифест иконок. ART-BIBLE §4.
+ * Манифест иконок. ART-BIBLE §7.
  *
  * Ключ совпадает с `base_key` предмета, `StatusId`, `TraitId` или
  * идентификатором зоны/архетипа. Значение — путь относительно
@@ -39,16 +39,16 @@ export const icons: Record<string, IconPath> = manifest.icons;
  * сразу потребует для них записи в манифесте.
  */
 export const ICON_ENTITIES = {
-  /** GDD §6.4. Карточки зон. */
+  /** GDD §7.4. Карточки зон. */
   zone: [...ZONE_IDS],
 
-  /** GDD §3.4, стартовый набор статусов. */
+  /** GDD §4.4, стартовый набор статусов. */
   status: ['bleed', 'poison', 'burn', 'stun', 'hex', 'fury', 'regen', 'shield', 'enrage', 'chill'],
 
-  /** GDD §4.1, четыре архетипа. Портреты. */
+  /** GDD §5.1, четыре архетипа. Портреты. */
   archetype: ['swordsman', 'guardian', 'blade', 'cursed'],
 
-  /** GDD §4.3, восемь слотов экипировки. Иконки пустого слота. */
+  /** GDD §5.3, восемь слотов экипировки. Иконки пустого слота. */
   slot: ['weapon', 'offhand', 'helmet', 'chest', 'bracers', 'boots', 'amulet', 'ring'],
 } as const satisfies Record<string, readonly string[]>;
 

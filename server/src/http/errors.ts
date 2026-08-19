@@ -1,4 +1,4 @@
-import { ERROR_STATUS, type ApiError, type ErrorCode } from '@bruteforce/shared';
+import { ERROR_STATUS, type ApiError, type ErrorCode } from '@extramundum/shared';
 
 /**
  * Ошибка, которую сервер осознанно показывает клиенту.

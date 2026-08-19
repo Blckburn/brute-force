@@ -1,4 +1,4 @@
-import { API_ROUTES } from '@bruteforce/shared';
+import { API_ROUTES } from '@extramundum/shared';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 
