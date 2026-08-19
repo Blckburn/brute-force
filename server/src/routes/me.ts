@@ -1,4 +1,4 @@
-import { API_ROUTES, type MeResponse } from '@bruteforce/shared';
+import { API_ROUTES, type MeResponse } from '@extramundum/shared';
 import { Hono } from 'hono';
 
 import { requireSession } from '../auth/session.ts';

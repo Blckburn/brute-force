@@ -17,7 +17,7 @@ import type { AppEnv } from '../http/middleware.ts';
  * надо ровно то, что стоит между клиентом и базой, а мок это и выкидывает.
  *
  * Локально: pnpm db:local:up, затем
- *   DATABASE_URL=postgres://postgres@127.0.0.1:55432/bruteforce pnpm test
+ *   DATABASE_URL=postgres://postgres@127.0.0.1:55432/extramundum pnpm test
  * В CI база поднимается сервисом postgres:16.
  */
 

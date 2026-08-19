@@ -16,7 +16,7 @@ import { containerEnum, equipmentSlotEnum, rarityEnum } from './enums.ts';
 import { players } from './game.ts';
 
 /**
- * player_traits — выбранные трейты. GDD §2.3, §4.2.
+ * player_traits — выбранные трейты. GDD §3.3, §5.2.
  *
  * Трейт выдаётся каждый пятый уровень, слот — порядковый номер выбора.
  */
@@ -38,10 +38,10 @@ export const playerTraits = pgTable(
 );
 
 /**
- * items — предметы. GDD §2.3, §5.
+ * items — предметы. GDD §3.3, §6.
  *
  * ilvl вынесен в отдельную колонку и участвует в расчёте силы предмета
- * (GDD §5.1). Это фикс провала v1.0, где легендарка 1 уровня была равна
+ * (GDD §6.1). Это фикс провала v1.0, где легендарка 1 уровня была равна
  * легендарке 30 уровня.
  *
  * affixes — jsonb, и именно jsonb, а не строка с JSON внутри. Двойное
@@ -67,7 +67,7 @@ export const items = pgTable(
       .default(sql`'[]'::jsonb`),
     upgradeLevel: integer('upgrade_level').notNull().default(0),
 
-    /** Защита от случайной продажи и разбора. GDD §5.3. */
+    /** Защита от случайной продажи и разбора. GDD §6.3. */
     locked: boolean('locked').notNull().default(false),
 
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
@@ -84,7 +84,7 @@ export const items = pgTable(
 );
 
 /**
- * equipment — что надето. GDD §2.3, §4.3.
+ * equipment — что надето. GDD §3.3, §5.3.
  *
  * Отдельная таблица, а не колонка в items, потому что слот обязан быть
  * занят не более чем одним предметом — это выражается уникальностью

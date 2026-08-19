@@ -14,9 +14,9 @@ const pkg: unknown = JSON.parse(
  * Если кто-то добавит сюда зависимость или обращение ко времени —
  * сборка упадёт в тот же день, а не через месяц.
  */
-describe('@bruteforce/sim: инварианты пакета', () => {
+describe('@extramundum/sim: инварианты пакета', () => {
   it('пакет собирается и экспортирует свои константы', () => {
-    expect(SIM_BUNDLE_MARKER).toBe('BRUTEFORCE_SIM_MUST_NEVER_REACH_THE_BROWSER');
+    expect(SIM_BUNDLE_MARKER).toBe('EXTRAMUNDUM_SIM_MUST_NEVER_REACH_THE_BROWSER');
     expect(SIM_LOG_VERSION).toBe(0);
   });
 

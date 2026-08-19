@@ -1,4 +1,4 @@
-import { API_ROUTES } from '@bruteforce/shared';
+import { API_ROUTES } from '@extramundum/shared';
 import { sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 

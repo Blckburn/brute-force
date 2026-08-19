@@ -1,5 +1,5 @@
 {
-  "name": "@bruteforce/data",
+  "name": "@extramundum/data",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -8,16 +8,25 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
-    "./balance.json": "./balance.json"
+    "./balance.json": "./balance.json",
+    "./assets.json": "./assets.json",
+    "./assets": {
+      "types": "./dist/assets.d.ts",
+      "default": "./dist/assets.js"
+    }
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "files": [
     "dist",
-    "balance.json"
+    "balance.json",
+    "assets.json"
   ],
   "scripts": {
     "build": "tsc --build",
     "test": "vitest run"
+  },
+  "dependencies": {
+    "@extramundum/shared": "workspace:*"
   }
 }

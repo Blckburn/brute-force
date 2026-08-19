@@ -1,4 +1,4 @@
-import { signUpInputSchema } from '@bruteforce/shared';
+import { signUpInputSchema } from '@extramundum/shared';
 import { Hono } from 'hono';
 
 import type { Database } from '../db/client.ts';
@@ -19,7 +19,7 @@ function isUniqueViolation(err: unknown, constraint: string): boolean {
  * Регистрация — собственный эндпоинт поверх Better Auth.
  *
  * Своим он сделан ради трёх вещей, которых у встроенного нет:
- *   1. валидация имени персонажа схемой из @bruteforce/shared;
+ *   1. валидация имени персонажа схемой из @extramundum/shared;
  *   2. проверка, что имя свободно, до создания учётной записи;
  *   3. ошибки в общем конверте ApiError с ключами локали.
  *

@@ -1,5 +1,5 @@
-import { API_ROUTES } from '@bruteforce/shared';
-import { eq, sql } from 'drizzle-orm';
+import { API_ROUTES } from '@extramundum/shared';
+import { eq, inArray, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { players } from '../db/schema/game.ts';
@@ -67,8 +67,9 @@ describe.skipIf(!HAS_DB)('API', () => {
       expect(row.gold).toBe(0);
       expect(row.paragonPoints).toBe(0);
       expect(row.elo).toBe(1000);
-      expect(row.founder).toBe(false);
       expect(row.seasonId).toBeNull();
+      // Номер выдаёт последовательность в БД: он есть и он положительный.
+      expect(row.exileNumber).toBeGreaterThan(0);
     });
 
     it('отклоняет занятое имя без учёта регистра', async () => {
@@ -193,6 +194,8 @@ describe.skipIf(!HAS_DB)('API', () => {
   describe('инвариант 1: клиент не может изменить своё состояние', () => {
     it('лишние поля в теле запроса игнорируются, а не записываются', async () => {
       const { jar, username } = await register(ctx);
+      const before = await ctx.db.select().from(players).where(eq(players.username, username));
+      const numberBefore = before[0]!.exileNumber;
 
       await post(
         ctx,
@@ -206,7 +209,7 @@ describe.skipIf(!HAS_DB)('API', () => {
           level: 40,
           xp: 1_000_000,
           elo: 9999,
-          founder: true,
+          exileNumber: 1,
         },
         jar,
       );
@@ -218,7 +221,7 @@ describe.skipIf(!HAS_DB)('API', () => {
       expect(row.level).toBe(1);
       expect(row.xp).toBe(0);
       expect(row.elo).toBe(1000);
-      expect(row.founder).toBe(false);
+      expect(row.exileNumber).toBe(numberBefore);
     });
 
     it('регистрация не даёт задать себе стартовые статы', async () => {
@@ -263,6 +266,62 @@ describe.skipIf(!HAS_DB)('API', () => {
         // Всегда её собственный профиль: параметры запроса ни на что не влияют.
         expect((body as { player: { username: string } }).player.username).toBe(alice.username);
       }
+    });
+  });
+
+  /**
+   * Номера изгнанных. LORE §2, GDD §1.
+   *
+   * Номер — не украшение: по нему видно, кто снаружи давно. Значит он
+   * обязан быть уникальным, монотонным и невыдаваемым дважды.
+   */
+  describe('номер изгнанного', () => {
+    it('выдаётся при регистрации и растёт', async () => {
+      const first = await register(ctx);
+      const second = await register(ctx);
+
+      const rows = await ctx.db
+        .select()
+        .from(players)
+        .where(inArray(players.username, [first.username, second.username]));
+
+      const a = rows.find((r) => r.username === first.username)!;
+      const b = rows.find((r) => r.username === second.username)!;
+
+      expect(a.exileNumber).toBeGreaterThan(0);
+      expect(b.exileNumber).toBeGreaterThan(a.exileNumber);
+    });
+
+    it('одинаковых номеров не бывает', async () => {
+      const all = await ctx.db.select({ n: players.exileNumber }).from(players);
+      const unique = new Set(all.map((r) => r.n));
+      expect(unique.size).toBe(all.length);
+    });
+
+    it('одновременные регистрации получают разные номера', async () => {
+      // Ради этого номер выдаёт последовательность в БД, а не SELECT MAX + 1:
+      // при параллельных вставках второй вариант выдал бы дубль.
+      const registered = await Promise.all([
+        register(ctx),
+        register(ctx),
+        register(ctx),
+        register(ctx),
+        register(ctx),
+      ]);
+      const names = registered.map((r) => r.username);
+
+      const rows = await ctx.db.select().from(players).where(inArray(players.username, names));
+
+      const numbers = rows.map((r) => r.exileNumber);
+      expect(rows).toHaveLength(names.length);
+      expect(new Set(numbers).size).toBe(numbers.length);
+    });
+
+    it('отдаётся клиенту в профиле', async () => {
+      const { jar } = await register(ctx);
+      const { body } = await get(ctx, API_ROUTES.me, jar);
+      const player = (body as { player: { exileNumber: number } }).player;
+      expect(player.exileNumber).toBeGreaterThan(0);
     });
   });
 

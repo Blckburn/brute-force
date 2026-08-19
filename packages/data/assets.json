@@ -1,0 +1,40 @@
+{
+  "$comment": [
+    "Манифест иконок, ART-BIBLE §7. Ключ -> путь относительно apps/web/public/assets/.",
+    "null означает «ещё не нарисовано»: UI покажет плейсхолдер, тест не упадёт.",
+    "Отсутствие ключа означает «про сущность забыли»: тест упадёт.",
+    "Путь, которому не соответствует файл на диске: тест упадёт.",
+    "Файлы кладёт scripts/process-assets.mjs, вручную сюда пути не пишут."
+  ],
+  "version": 1,
+  "icons": {
+    "zone.wastes": null,
+    "zone.warcamp": null,
+    "zone.catacombs": null,
+    "zone.forge": null,
+    "zone.abyss": null,
+    "zone.rift": null,
+    "status.bleed": null,
+    "status.poison": null,
+    "status.burn": null,
+    "status.stun": null,
+    "status.hex": null,
+    "status.fury": null,
+    "status.regen": null,
+    "status.shield": null,
+    "status.enrage": null,
+    "status.chill": null,
+    "archetype.swordsman": null,
+    "archetype.guardian": null,
+    "archetype.blade": null,
+    "archetype.cursed": null,
+    "slot.weapon": null,
+    "slot.offhand": null,
+    "slot.helmet": null,
+    "slot.chest": null,
+    "slot.bracers": null,
+    "slot.boots": null,
+    "slot.amulet": null,
+    "slot.ring": null
+  }
+}

@@ -28,7 +28,7 @@ jobs:
         image: postgres:16
         env:
           POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: bruteforce
+          POSTGRES_DB: extramundum
         ports:
           - 5432:5432
         options: >-
@@ -38,7 +38,7 @@ jobs:
           --health-retries 5
 
     env:
-      DATABASE_URL: postgres://postgres:postgres@localhost:5432/bruteforce
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/extramundum
 
     steps:
       - uses: actions/checkout@v5
@@ -82,6 +82,17 @@ jobs:
             git status --porcelain server/drizzle
             exit 1
           fi
+
+      # Перенумерация разделов документа молча ломает десятки ссылок
+      # в комментариях. Глазами это не ловится, поэтому ловится здесь.
+      - name: Ссылки на разделы документов ведут туда, куда написано
+        run: node scripts/check-doc-refs.mjs --quiet
+
+      # Пустой assets-src/ — нормальное состояние, скрипт выйдет с нулём.
+      # Как только появятся PNG, шаг начнёт проверять размер, прозрачность
+      # и вес, не записывая ничего на диск.
+      - name: Иконки проходят проверки ART-BIBLE
+        run: pnpm assets:check
 
       - name: Сборка
         run: pnpm build

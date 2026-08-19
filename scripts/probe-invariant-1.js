@@ -20,7 +20,7 @@
  */
 (async () => {
   const API = window.__API__ || document.querySelector('meta[name="api-url"]')?.content;
-  const guess = API || prompt('URL сервера (например https://bruteforce-server.onrender.com)');
+  const guess = API || prompt('URL сервера (например https://extramundum-server.onrender.com)');
   if (!guess) return console.error('Нужен URL сервера');
   const base = guess.replace(/\/+$/, '');
 
@@ -51,7 +51,7 @@
   add('адрес neon.tech в коде страницы', /neon\.tech/.test(code) ? 'НАЙДЕН — это провал' : 'нет');
   add(
     'маркер боевого движка',
-    code.includes('BRUTEFORCE_SIM_MUST_NEVER') ? 'НАЙДЕН — это провал' : 'нет',
+    code.includes('EXTRA MUNDUM_SIM_MUST_NEVER') ? 'НАЙДЕН — это провал' : 'нет',
   );
   add(
     'следы drizzle / better-auth',
@@ -96,7 +96,7 @@
       level: 40,
       xp: 1000000,
       elo: 9999,
-      founder: true,
+      exileNumber: 1,
     }),
   });
   add('POST /battle/start с золотом в теле', await json(attack));
@@ -104,6 +104,7 @@
   const after = await (await fetch(base + '/me', { credentials: 'include' })).json();
   add('золото ПОСЛЕ попытки', after?.player?.gold);
   add('уровень ПОСЛЕ попытки', after?.player?.level);
+  add('номер изгнанного', after?.player?.exileNumber);
 
   // 5. Подделка личности.
   add('кто я по мнению сервера', after?.player?.username);

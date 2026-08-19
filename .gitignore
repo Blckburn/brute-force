@@ -18,3 +18,9 @@ coverage/
 .vite/
 .DS_Store
 *.log
+
+# Иконки: исходники PNG кладёт человек, WebP генерирует
+# scripts/process-assets.mjs. Готовые файлы коммитятся (ART-BIBLE §5),
+# а вот мусор от экспериментов — нет.
+assets-src/**/*.psd
+assets-src/**/*.ai

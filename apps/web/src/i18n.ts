@@ -12,7 +12,7 @@ export type Locale = 'ru' | 'en';
 export type Key = keyof typeof ru;
 
 const DICTS: Record<Locale, Record<string, string>> = { ru, en };
-const STORAGE_KEY = 'bruteforce.locale';
+const STORAGE_KEY = 'extramundum.locale';
 
 function detect(): Locale {
   const stored = localStorage.getItem(STORAGE_KEY);

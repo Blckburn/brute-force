@@ -6,7 +6,7 @@ import {
   type MeResponse,
   type SignInInput,
   type SignUpInput,
-} from '@bruteforce/shared';
+} from '@extramundum/shared';
 
 /**
  * Типизированный клиент API.
@@ -16,7 +16,19 @@ import {
  * и разобрать ответ. Всё, что меняет состояние игрока, решает сервер
  * (инвариант 1).
  */
-const BASE_URL: string = import.meta.env['VITE_API_URL'] ?? 'http://localhost:8787';
+/**
+ * Префикс всех запросов к API.
+ *
+ * По умолчанию ОТНОСИТЕЛЬНЫЙ `/api` — то есть тот же origin, что и сам
+ * клиент. Это принципиально: сессия живёт в куке, а кука с чужого домена
+ * является сторонней, и браузеры режут такие всё активнее. Через
+ * относительный путь запрос идёт на домен клиента, статика проксирует
+ * его на сервер (render.yaml), и кука становится первой стороной.
+ *
+ * Абсолютный URL можно задать через VITE_API_URL — но тогда возвращается
+ * ровно та проблема со сторонней кукой, ради которой всё это сделано.
+ */
+const BASE_URL: string = import.meta.env['VITE_API_URL'] ?? '/api';
 
 /** Ошибка, у которой есть ключ локали. Именно её показывает UI. */
 export class ApiClientError extends Error {
@@ -68,7 +80,7 @@ async function request(path: string, init: RequestInit = {}): Promise<unknown> {
 
 export const api = {
   async register(input: SignUpInput): Promise<void> {
-    await request('/auth/register', { method: 'POST', body: JSON.stringify(input) });
+    await request(API_ROUTES.register, { method: 'POST', body: JSON.stringify(input) });
   },
 
   async signIn(input: SignInInput): Promise<void> {

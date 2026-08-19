@@ -1,5 +1,5 @@
 {
-  "name": "@bruteforce/web",
+  "name": "@extramundum/web",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -10,9 +10,10 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@bruteforce/shared": "workspace:*",
+    "@extramundum/shared": "workspace:*",
     "three": "^0.181.1",
-    "zod": "^4.1.13"
+    "zod": "^4.1.13",
+    "@extramundum/data": "workspace:*"
   },
   "devDependencies": {
     "@types/three": "^0.181.0",

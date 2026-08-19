@@ -3,7 +3,15 @@
   "compilerOptions": {
     "rootDir": ".",
     "outDir": "dist",
-    "types": []
+    "types": [],
+    "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": true
   },
-  "include": ["index.ts", "balance.json"]
+  "include": ["index.ts", "assets.ts", "balance.json", "assets.json"],
+  "exclude": ["__tests__/**"],
+  "references": [
+    {
+      "path": "../shared"
+    }
+  ]
 }

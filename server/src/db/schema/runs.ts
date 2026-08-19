@@ -16,7 +16,7 @@ import { battleResultEnum, difficultyEnum, runStateEnum, zoneEnum } from './enum
 import { players } from './game.ts';
 
 /**
- * runs — забеги с эвакуацией. GDD §2.3, §6.2.
+ * runs — забеги с эвакуацией. GDD §3.3, §7.2.
  *
  * bag — «сумка забега»: лут, который ещё не попал в инвентарь. При смерти
  * теряется целиком. Именно эта таблица делает автобаттлер игрой про
@@ -32,7 +32,7 @@ export const runs = pgTable(
 
     zone: zoneEnum('zone').notNull(),
     difficulty: difficultyEnum('difficulty').notNull(),
-    /** Сколько боёв пройдено: 0..5 (GDD §6.2). */
+    /** Сколько боёв пройдено: 0..5 (GDD §7.2). */
     fightIndex: integer('fight_index').notNull().default(0),
     bag: jsonb('bag')
       .notNull()
@@ -44,7 +44,7 @@ export const runs = pgTable(
   },
   (table) => [
     // Активный забег у игрока может быть только один. Проверка на уровне
-    // БД, а не кода: «не идёт ли уже рейд» — шаг 2 из GDD §2.2.
+    // БД, а не кода: «не идёт ли уже рейд» — шаг 2 из GDD §3.2.
     uniqueIndex('runs_one_active_per_player_idx')
       .on(table.playerId)
       .where(sql`${table.state} = 'active'`),
@@ -54,11 +54,11 @@ export const runs = pgTable(
 );
 
 /**
- * battles — журналы боёв. GDD §2.3, §2.2.
+ * battles — журналы боёв. GDD §3.3, §3.2.
  *
  * log хранится целиком, потому что он детерминирован и является
  * доказательством: по нему воспроизводится бой и строится реплей
- * по ссылке (GDD §2.2). seed хранится рядом — с ним лог перепроверяем.
+ * по ссылке (GDD §3.2). seed хранится рядом — с ним лог перепроверяем.
  */
 export const battles = pgTable(
   'battles',
@@ -85,7 +85,7 @@ export const battles = pgTable(
 );
 
 /**
- * dailies — суточные счётчики. GDD §2.3, §7, §8.
+ * dailies — суточные счётчики. GDD §3.3, §8, §9.
  *
  * day_utc — дата СЕРВЕРА. В v1.0 сток магазина и попытки арены зависели
  * от new Date() в браузере: перевод часов давал новый сток, F5 давал
@@ -114,7 +114,7 @@ export const dailies = pgTable(
 );
 
 /**
- * arena_ladder — рейтинг арены. GDD §2.3, §7.
+ * arena_ladder — рейтинг арены. GDD §3.3, §8.
  *
  * snapshot — копия билда игрока на момент попадания в таблицу. Соперник
  * сражается именно со снапшотом: арена асинхронная, живого противника
@@ -137,7 +137,7 @@ export const arenaLadder = pgTable(
   },
   (table) => [
     uniqueIndex('arena_ladder_season_player_idx').on(table.seasonId, table.playerId),
-    // Матчмейкинг ищет соперников по ELO в окне ±150 (GDD §7).
+    // Матчмейкинг ищет соперников по ELO в окне ±150 (GDD §8).
     index('arena_ladder_season_elo_idx').on(table.seasonId, table.elo),
     check('arena_ladder_elo_non_negative', sql`${table.elo} >= 0`),
     check('arena_ladder_wins_non_negative', sql`${table.wins} >= 0`),

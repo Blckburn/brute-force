@@ -1,4 +1,4 @@
-import { PASSWORD_MAX, PASSWORD_MIN } from '@bruteforce/shared';
+import { API_ROUTES, PASSWORD_MAX, PASSWORD_MIN } from '@extramundum/shared';
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 
@@ -16,10 +16,10 @@ export type Auth = ReturnType<typeof createAuth>;
  */
 export function createAuth(db: Database, config: Config, log: Logger) {
   return betterAuth({
-    appName: 'bruteforce',
+    appName: 'extramundum',
     secret: config.BETTER_AUTH_SECRET,
     baseURL: config.BETTER_AUTH_URL,
-    basePath: '/api/auth',
+    basePath: API_ROUTES.auth,
     trustedOrigins: config.CORS_ORIGINS,
 
     database: drizzleAdapter(db, {
@@ -46,11 +46,13 @@ export function createAuth(db: Database, config: Config, log: Logger) {
     },
 
     advanced: {
-      // Клиент и сервер живут на разных доменах Render, поэтому куке
-      // нужен SameSite=None; secure обязателен, иначе браузер её отбросит.
+      // SameSite=Lax, а не None: клиент обращается к API по относительному
+      // пути на своём же домене (статика проксирует запрос на сервер),
+      // поэтому кука первой стороны. SameSite=None понадобился бы только
+      // при обращении на чужой домен — и тогда браузер вправе её выбросить.
       defaultCookieAttributes:
         config.NODE_ENV === 'production'
-          ? { sameSite: 'none', secure: true, httpOnly: true }
+          ? { sameSite: 'lax', secure: true, httpOnly: true }
           : { sameSite: 'lax', secure: false, httpOnly: true },
     },
 
