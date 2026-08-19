@@ -6,7 +6,7 @@ import type { Logger } from '../logger.ts';
 /**
  * Проверка прав роли, под которой работает сервер.
  *
- * Разделение ролей (server/sql/app-role.sql) — договорённость, которую
+ * Разделение ролей (server/sql/app-role-grants.sql) — договорённость, которую
  * легко забыть применить на новом окружении. Поэтому сервер проверяет её
  * сам при каждом старте и говорит, если работает ролью с лишними правами.
  *
@@ -79,6 +79,6 @@ export async function reportRuntimePrivileges(
     mayCreateInPublic: privileges.mayCreateInPublic,
     seesMigrationJournal: privileges.seesMigrationJournal,
     isSuperuser: privileges.isSuperuser,
-    fix: 'server/sql/app-role.sql — завести extramundum_app и указать её в DATABASE_URL',
+    fix: 'server/sql/app-role-grants.sql — выдать extramundum_app права и указать её в DATABASE_URL',
   });
 }

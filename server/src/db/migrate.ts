@@ -11,7 +11,7 @@ import { createDatabase } from './client.ts';
  *
  * Ходит в базу ОТДЕЛЬНОЙ РОЛЬЮ с правами DDL (`MIGRATE_DATABASE_URL`),
  * а не той, под которой работает сервер. Рантайму DDL не нужен ни для
- * чего, поэтому у него его и нет — см. server/sql/app-role.sql.
+ * чего, поэтому у него его и нет — см. server/sql/app-role-grants.sql.
  *
  * Если MIGRATE_DATABASE_URL не задан, берётся DATABASE_URL: так работают
  * локальная разработка и CI, где обе роли — это один суперпользователь

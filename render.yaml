@@ -48,7 +48,8 @@ services:
 
       # Строка РАНТАЙМА: роль extramundum_app, только работа со строками.
       # Pooled (в хосте есть "-pooler"), ADR 0001.
-      # Заводится файлом server/sql/app-role.sql.
+      # Роль заводится в консоли Neon (там управление ролями вынесено
+      # в панель), права ей выдаёт server/sql/app-role-grants.sql.
       - key: DATABASE_URL
         sync: false
       # Строка МИГРАЦИЙ: роль-владелец с правами DDL (на Neon это
