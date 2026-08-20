@@ -37,6 +37,9 @@ function withStatus(statuses: Starting[], overrides: Parameters<typeof fighter>[
   return resolveBattle(setup, balance, 'status-probe');
 }
 
+/** Противник для расчёта эффективных статов: часть пассивов смотрит на цель. */
+const dummy = () => createFighterState(fighter(), balance);
+
 const ticksOf = (events: readonly BattleEvent[], status: StatusId, target = 0) =>
   events.filter((e) => e.t === 'status_tick' && e.status === status && e.target === target);
 
@@ -134,17 +137,21 @@ describe('каждый эффект наблюдаем в логе с число
     );
     hexed.statuses.push({ instance: 1, id: 'hex', stacks: 2, duration: 10, seq: 1 });
 
-    expect(effectiveStats(hexed, balance).atk).toBe(
+    expect(effectiveStats(hexed, dummy(), balance).atk).toBe(
       base.config.atk + balance.statuses.hex.atkPerStack * 2,
     );
-    expect(effectiveStats(hexed, balance).atk).toBeLessThan(effectiveStats(base, balance).atk);
+    expect(effectiveStats(hexed, dummy(), balance).atk).toBeLessThan(
+      effectiveStats(base, dummy(), balance).atk,
+    );
   });
 
   it('fury повышает ATK за стек', () => {
     const state = createFighterState(fighter({ atk: 10 }), balance);
     state.statuses.push({ instance: 1, id: 'fury', stacks: 3, duration: -1, seq: 1 });
 
-    expect(effectiveStats(state, balance).atk).toBe(10 + balance.statuses.fury.atkPerStack * 3);
+    expect(effectiveStats(state, dummy(), balance).atk).toBe(
+      10 + balance.statuses.fury.atkPerStack * 3,
+    );
   });
 
   it('chill снижает SPD и боец действует реже', () => {
@@ -159,9 +166,9 @@ describe('каждый эффект наблюдаем в логе с число
 
   it('enrage даёт +50% урона и −20% брони по GDD §7.5', () => {
     const state = createFighterState(fighter({ atk: 60, armor: 100 }), balance);
-    const plain = effectiveStats(state, balance);
+    const plain = effectiveStats(state, dummy(), balance);
     state.statuses.push({ instance: 1, id: 'enrage', stacks: 1, duration: -1, seq: 1 });
-    const raging = effectiveStats(state, balance);
+    const raging = effectiveStats(state, dummy(), balance);
 
     expect(raging.attackMultiplierBonus).toBe(balance.statuses.enrage.attackMultiplierBonus);
     expect(raging.armor).toBeCloseTo(plain.armor * balance.statuses.enrage.armorMultiplier, 10);
@@ -328,19 +335,19 @@ describe('модификаторы не мутируют базу', () => {
   it('после истечения статуса стат возвращается к исходному', () => {
     const config = fighter({ atk: 40, spd: 18 });
     const state = createFighterState(config, balance);
-    const before = effectiveStats(state, balance);
+    const before = effectiveStats(state, dummy(), balance);
 
     const clock = createStatusClock();
     applyStatus(state, 0, 'hex', 2, 3, balance, clock);
     applyStatus(state, 0, 'chill', 2, 3, balance, clock);
 
-    const during = effectiveStats(state, balance);
+    const during = effectiveStats(state, dummy(), balance);
     expect(during.atk).toBeLessThan(before.atk);
     expect(during.spd).toBeLessThan(before.spd);
 
     for (let i = 0; i < 3; i++) tickFighterStatuses(state, 0, balance, STATUS_ORDER);
 
-    const after = effectiveStats(state, balance);
+    const after = effectiveStats(state, dummy(), balance);
     expect(after.atk).toBe(before.atk);
     expect(after.spd).toBe(before.spd);
     // База не тронута — это и есть главное свойство.
@@ -357,7 +364,7 @@ describe('модификаторы не мутируют базу', () => {
       tickFighterStatuses(state, 0, balance, STATUS_ORDER);
       tickFighterStatuses(state, 0, balance, STATUS_ORDER);
       expect(state.statuses).toHaveLength(0);
-      expect(effectiveStats(state, balance).atk).toBe(30);
+      expect(effectiveStats(state, dummy(), balance).atk).toBe(30);
     }
   });
 });

@@ -50,6 +50,88 @@ export const STATUS_IDS = [
 export const statusIdSchema = z.enum(STATUS_IDS);
 export type StatusId = z.infer<typeof statusIdSchema>;
 
+/* ──────────────────────────────── трейты ────────────────────────────── */
+
+/**
+ * Школы трейтов. GDD §4.5: пул разбит по четырём школам, у каждой
+ * 2–3 якорных трейта, вокруг которых строится билд.
+ */
+export const TRAIT_SCHOOLS = ['str', 'def', 'agi', 'mag'] as const;
+export const traitSchoolSchema = z.enum(TRAIT_SCHOOLS);
+export type TraitSchool = z.infer<typeof traitSchoolSchema>;
+
+/**
+ * Выбираемые трейты. GDD §4.5: пул расширяется до ~30.
+ *
+ * Порядок — по школам, внутри школы якорные первыми. Шесть трейтов
+ * из аудита v1.0 (§13, пункт 3) реализованы в первую очередь: `warlord`,
+ * `cursed`, `fortress`, `thorns`, `phantom`, `hexblade`.
+ */
+export const TRAIT_IDS = [
+  // STR — урон и риск
+  'warlord',
+  'cursed',
+  'executioner',
+  'bloodlust',
+  'berserker',
+  'overpower',
+  'ironGrip',
+  'butcher',
+
+  // DEF — выживание
+  'fortress',
+  'thorns',
+  'secondWind',
+  'bulwark',
+  'stoneskin',
+  'retribution',
+  'hardened',
+  'resolve',
+
+  // AGI — темп и уклонение
+  'phantom',
+  'windup',
+  'riposte',
+  'quickstep',
+  'deadeye',
+  'bleedout',
+  'slippery',
+
+  // MAG — статусы
+  'hexblade',
+  'plaguebearer',
+  'amplifier',
+  'pyromancer',
+  'leech',
+  'frostbite',
+  'siphon',
+] as const;
+
+/**
+ * Врождённые трейты причин изгнания. GDD §5.1.
+ *
+ * Не входят в пул выбора: их нельзя взять на уровне, они приходят
+ * с прошлым персонажа и остаются навсегда.
+ */
+export const INNATE_TRAIT_IDS = [
+  'innateThief',
+  'innateGuard',
+  'innateAdvocate',
+  'innateScholar',
+] as const;
+
+export const ALL_TRAIT_IDS = [...TRAIT_IDS, ...INNATE_TRAIT_IDS] as const;
+export const traitIdSchema = z.enum(ALL_TRAIT_IDS);
+export type TraitId = z.infer<typeof traitIdSchema>;
+
+/**
+ * Причины изгнания. GDD §5.1: игрок выбирает не класс, а прошлое.
+ * Каждая даёт стартовые статы и один врождённый трейт.
+ */
+export const ARCHETYPE_IDS = ['theft', 'brawl', 'advocacy', 'forbidden'] as const;
+export const archetypeIdSchema = z.enum(ARCHETYPE_IDS);
+export type ArchetypeId = z.infer<typeof archetypeIdSchema>;
+
 /* ──────────────────────────── конфигурация бойца ─────────────────────── */
 
 export const weaponConfigSchema = z.object({
@@ -127,6 +209,15 @@ export const fighterConfigSchema = z.object({
       }),
     )
     .default([]),
+
+  /**
+   * Трейты бойца. GDD §4.5.
+   *
+   * Один список и для выбранных на уровнях, и для врождённого трейта
+   * причины изгнания: движку незачем их различать, разница только
+   * в том, кто их туда положил.
+   */
+  traits: z.array(traitIdSchema).default([]),
 });
 export type FighterConfig = z.infer<typeof fighterConfigSchema>;
 
@@ -143,6 +234,23 @@ export type BattleSetup = z.infer<typeof battleSetupSchema>;
  * аргументом. Схема существует, чтобы сервер проверил их один раз
  * при загрузке, а не ловил `undefined` посреди боя.
  */
+/**
+ * Отбросить пояснительные ключи balance.json.
+ *
+ * В файле у каждого блока есть `$source`, `$note` и пометка
+ * `calibration` — они для человека, а не для движка. `z.object`
+ * отбрасывает лишнее сам, а `z.record` обязан описать ВСЕ ключи,
+ * поэтому для записей это делается здесь.
+ */
+function dropMeta(value: unknown): unknown {
+  if (typeof value !== 'object' || value === null) return value;
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>).filter(
+      ([key]) => !key.startsWith('$') && key !== 'calibration',
+    ),
+  );
+}
+
 const matchupRowSchema = z.object({
   cloth: z.number(),
   light: z.number(),
@@ -222,6 +330,37 @@ export const combatBalanceSchema = z.object({
     initiativeThreshold: z.number().positive(),
     limit: z.int().positive(),
   }),
+
+  /**
+   * Коэффициенты трейтов. GDD §4.5 задаёт шесть аудитных поимённо
+   * с числами; остальные спроектированы при реализации M1c и помечены
+   * в balance.json как ожидающие калибровки.
+   *
+   * Схема плоская: у каждого трейта свой набор полей, и общего
+   * знаменателя у «отражает 15%» и «каждый третий ход ×1.6» нет.
+   */
+  traits: z.preprocess(dropMeta, z.record(z.string(), z.record(z.string(), z.number()))),
+
+  /**
+   * Стартовые статы причин изгнания. GDD §5.1 описывает их словами
+   * («сбалансированный», «DEF/HP», «AGI/SPD», «MAG»), но чисел не даёт.
+   * Назначены при реализации, выверяются матрицей винрейтов §4.6.
+   */
+  archetypes: z.preprocess(
+    dropMeta,
+    z.record(
+      z.string(),
+      z.object({
+        atk: z.number(),
+        def: z.number(),
+        agi: z.number(),
+        spd: z.number(),
+        accuracy: z.number(),
+        armor: z.number(),
+        trait: traitIdSchema,
+      }),
+    ),
+  ),
 });
 export type CombatBalance = z.infer<typeof combatBalanceSchema>;
 
@@ -289,9 +428,6 @@ export type RollBreakdown = {
  * он бы не смог.
  */
 export type StatusInstanceId = number;
-
-/** Трейты появятся в M1c; тип объявлен, набор пока пуст. */
-export type TraitId = string;
 
 /**
  * Событие боевого лога. GDD §3.2.

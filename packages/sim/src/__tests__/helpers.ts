@@ -30,6 +30,7 @@ export function fighter(overrides: Partial<FighterConfig> = {}): FighterConfig {
     weapon: { dmgMin: 10, dmgMax: 10, ilvl: 1, class: 'balanced' },
     shield: null,
     statuses: [],
+    traits: [],
     ...overrides,
   };
 }

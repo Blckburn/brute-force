@@ -47,7 +47,29 @@ export type StatusInstance = {
   duration: number;
   /** Порядок наложения. Разрешает ничью при сортировке. */
   readonly seq: number;
+  /**
+   * Прибавка к урону за тик от того, КТО наложил статус (amplifier).
+   *
+   * Записывается в момент наложения, а не читается при тике. Тикает
+   * статус на жертве, а усиливает его источник — читать модификатор
+   * жертвы значило бы, что `amplifier` усиливает чужие эффекты на себе.
+   */
+  damageBonus: number;
 };
+
+/**
+ * Что накладывающий добавляет к статусу.
+ *
+ * Передаётся аргументом, а не вычисляется здесь: реестр статусов не знает
+ * про трейты и не должен. Ноль — нейтральный источник (стартовые статусы
+ * зоны и босса).
+ */
+export type StatusSource = {
+  readonly dotDamageBonus: number;
+  readonly durationBonus: number;
+};
+
+export const NEUTRAL_SOURCE: StatusSource = { dotDamageBonus: 0, durationBonus: 0 };
 
 /** Прибавки к статам от одного статуса. Складываются, множители перемножаются. */
 export type StatModifiers = {
@@ -338,15 +360,22 @@ export function applyStatus(
   duration: number,
   balance: CombatBalance,
   clock: StatusClock,
+  source: StatusSource = NEUTRAL_SOURCE,
 ): readonly BattleEvent[] {
   const def = statusDefinition(id);
-  const finalDuration = duration === 0 ? def.defaultDuration(balance) : duration;
+  const base = duration === 0 ? def.defaultDuration(balance) : duration;
+  // Продление (innateScholar) не трогает статусы «до конца боя»: −1 —
+  // это признак, а не число тиков, и прибавка к нему дала бы 0.
+  const finalDuration = base === -1 ? -1 : base + source.durationBonus;
 
   if (def.stacking === 'refresh') {
     const existing = fighter.statuses.find((i) => i.id === id);
     if (existing !== undefined) {
       existing.stacks += stacks;
       existing.duration = finalDuration;
+      // Обновление перенимает источник последнего наложения: усиление
+      // относится к удару, который его обновил.
+      existing.damageBonus = source.dotDamageBonus;
       return [
         {
           t: 'status_apply',
@@ -374,7 +403,10 @@ export function applyStatus(
       if (a < b || (a === b && inst.seq < weakest.seq)) weakest = inst;
     }
     const events = removeInstance(fighter, target, weakest);
-    return [...events, ...applyStatus(fighter, target, id, stacks, duration, balance, clock)];
+    return [
+      ...events,
+      ...applyStatus(fighter, target, id, stacks, duration, balance, clock, source),
+    ];
   }
 
   const instance: StatusInstance = {
@@ -383,6 +415,7 @@ export function applyStatus(
     stacks,
     duration: finalDuration,
     seq: clock.nextSeq++,
+    damageBonus: source.dotDamageBonus,
   };
   fighter.statuses.push(instance);
 
@@ -491,7 +524,12 @@ export function tickFighterStatuses(
     const result = def.tick?.(inst, balance);
     if (result === null || result === undefined) continue;
 
-    const amount = Math.max(0, Math.round(result.amount));
+    // Усиление источника — только на урон. Лечение чужим `amplifier`
+    // не усиливается: это эффект на цели, а бонус принадлежит тому,
+    // кто эффект наложил, и лечить врага он не станет.
+    const scaled =
+      result.kind === 'damage' ? result.amount * (1 + inst.damageBonus) : result.amount;
+    const amount = Math.max(0, Math.round(scaled));
     if (amount === 0) continue;
 
     if (result.kind === 'damage') {

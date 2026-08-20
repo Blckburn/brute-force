@@ -55,8 +55,16 @@ export function resolveAttack(
   // Статы читаются ОДИН раз на удар и уже с учётом активных статусов.
   // Читать `config` напрямую здесь нельзя: тогда hex, fury и chill
   // существовали бы в описании и не существовали в бою.
-  const att = effectiveStats(attacker, balance);
-  const def = effectiveStats(defender, balance);
+  const att = effectiveStats(attacker, defender, balance);
+  const def = effectiveStats(defender, attacker, balance);
+
+  // ── Шаг 0. Избегание. Удар не состоялся вовсе (GDD §4.2).
+  //    Отдельный бросок ДО уклонения: общий связал бы их так же, как
+  //    в v1.0 были связаны уклонение и блок.
+  if (def.avoidChance > 0 && rng.chance(def.avoidChance)) {
+    events.push({ t: 'dodge', actor: defenderIndex, mitigated: 0 });
+    return { kind: 'dodged', events };
+  }
 
   // ── Шаг 1. Уклонение. Промах, урона нет.
   const dodge = dodgeChance(def.agi, att.accuracy, balance);
@@ -73,7 +81,8 @@ export function resolveAttack(
     // Отдельный бросок: см. пункт 5 аудита в шапке файла.
     if (rng.chance(offhand.blockChance)) {
       blocked = true;
-      blockReduction = offhand.blockReduction;
+      // Трейт может переопределить силу блока (fortress: гасит полностью).
+      blockReduction = def.blockReductionOverride ?? offhand.blockReduction;
     }
   }
 
@@ -85,16 +94,30 @@ export function resolveAttack(
   const scale = ilvlScale(weapon.ilvl, balance);
 
   // ── Шаг 4. Множитель ATK.
-  const atkMult = atkMultiplier(att.atk, balance, att.attackMultiplierBonus);
+  // Множители трейтов входят в множитель атаки, а не отдельным полем
+  // разбора: формат лога от этого не меняется, а произведение шагов
+  // по-прежнему даёт итог.
+  const atkMult =
+    atkMultiplier(att.atk, balance, att.attackMultiplierBonus) *
+    att.outgoingDamageMultiplier *
+    def.incomingDamageMultiplier;
 
   // ── Шаг 5. Матчап «класс оружия × класс брони».
   const matchup = matchupMultiplier(weapon.class, defender.config.armorClass, balance);
 
   // ── Шаг 6. Митигация бронёй.
-  const dr = mitigation(def.armor, attacker.config.level, balance);
+  const effectiveArmor = def.armor * (1 - att.armorPenetration);
+  const dr = mitigation(effectiveArmor, attacker.config.level, balance);
 
   // ── Шаг 7. Крит. Тоже отдельный бросок.
-  const crit = rng.chance(critChance(att.agi, attacker.config.critBonus, balance));
+  //    Гарантия трейта заменяет бросок, а не складывается с ним: бросок
+  //    всё равно делается, чтобы поток генератора не зависел от того,
+  //    взведён трейт или нет — иначе один и тот же сид давал бы разные
+  //    бои у бойцов с одинаковым снаряжением.
+  const critRoll = rng.chance(
+    critChance(att.agi, attacker.config.critBonus, balance) * def.enemyCritMultiplier,
+  );
+  const crit = att.guaranteedCrit || critRoll;
   const critMult = crit ? balance.damage.critMultiplier : 1;
 
   // ── Шаг 8. Эффекты — M1b и M1c. Здесь их нет, и место под них не занято

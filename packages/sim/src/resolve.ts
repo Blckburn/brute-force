@@ -18,6 +18,7 @@ import {
   STATUS_ORDER,
   type StatusClock,
 } from './statuses.js';
+import { fireTraitHook } from './traits.js';
 
 /** Версия формата лога. Инкрементируется при несовместимых изменениях. */
 export const LOG_VERSION = 2;
@@ -68,11 +69,17 @@ export function resolveBattle(
   // выдать статус, пока нет трейтов.
   applyStartingStatuses(fighters, balance, clock, events);
 
+  // Трейты, срабатывающие на входе в бой.
+  for (const index of [0, 1] as const) {
+    events.push(...hook('onBattleStart', fighters, index, balance, rng, clock));
+  }
+
   let tick = 0;
   let winner: ActorIndex | null = null;
 
   outer: while (tick < limit) {
-    for (const f of fighters) f.initiative += effectiveStats(f, balance).spd;
+    fighters[0].initiative += effectiveStats(fighters[0], fighters[1], balance).spd;
+    fighters[1].initiative += effectiveStats(fighters[1], fighters[0], balance).spd;
 
     for (const actor of actingOrder(fighters, initiativeThreshold, rng)) {
       const attacker = fighters[actor];
@@ -94,9 +101,26 @@ export function resolveBattle(
       attacker.skippedLastTurn = false;
 
       events.push({ t: 'turn_start', actor, tick });
+      events.push(...hook('onTurnStart', fighters, actor, balance, rng, clock));
+
+      // Ход мог убить самого ходящего: cursed платит HP за каждый ход.
+      if (attacker.hp <= 0) {
+        events.push({ t: 'death', actor });
+        winner = defenderIndex;
+        break outer;
+      }
 
       const outcome = resolveAttack(attacker, defender, balance, rng, actor, defenderIndex);
       events.push(...outcome.events);
+
+      if (outcome.kind === 'dodged') {
+        // Уклонение — событие для обеих сторон: атакующий сбрасывает серию,
+        // защитник может взвести ответ. Числа урона нет, и это признак.
+        events.push(
+          ...hook('onBeforeAttack', fighters, actor, balance, rng, clock, { missed: true }),
+        );
+        events.push(...hook('onTakeDamage', fighters, defenderIndex, balance, rng, clock));
+      }
 
       if (outcome.kind === 'hit') {
         // Поглощение стоит между расчётом и применением: щит съедает
@@ -118,9 +142,21 @@ export function resolveBattle(
           crit: outcome.crit,
           hpAfter: defender.hp,
         });
+
+        const payload = { amount: absorbed.remaining, crit: outcome.crit };
+        events.push(...hook('onHit', fighters, actor, balance, rng, clock, payload));
+        events.push(...hook('onTakeDamage', fighters, defenderIndex, balance, rng, clock, payload));
+      }
+
+      // Смерть могла прийти и от шипов — проверяем обоих.
+      if (attacker.hp <= 0) {
+        events.push({ t: 'death', actor });
+        winner = defenderIndex;
+        break outer;
       }
 
       if (defender.hp <= 0) {
+        events.push(...hook('onKill', fighters, actor, balance, rng, clock));
         events.push({ t: 'death', actor: defenderIndex });
         winner = actor;
         break outer;
@@ -203,4 +239,32 @@ function actingOrder(
   if (a > b) return [0, 1];
   if (b > a) return [1, 0];
   return rng.chance(0.5) ? [0, 1] : [1, 0];
+}
+
+/**
+ * Вызов хука трейтов у одного бойца.
+ *
+ * Существует затем, чтобы цикл не знал ни одного трейта по имени
+ * и не собирал контекст руками в шести местах.
+ */
+function hook(
+  name: Parameters<typeof fireTraitHook>[0],
+  fighters: readonly [FighterState, FighterState],
+  index: ActorIndex,
+  balance: CombatBalance,
+  rng: Rng,
+  clock: StatusClock,
+  payload: { amount?: number; crit?: boolean; missed?: boolean } = {},
+): readonly BattleEvent[] {
+  const opponentIndex: ActorIndex = index === 0 ? 1 : 0;
+  return fireTraitHook(name, {
+    self: fighters[index],
+    selfIndex: index,
+    opponent: fighters[opponentIndex],
+    opponentIndex,
+    balance,
+    rng,
+    clock,
+    ...payload,
+  });
 }

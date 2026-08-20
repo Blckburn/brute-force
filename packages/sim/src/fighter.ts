@@ -1,6 +1,13 @@
-import type { ArmorClass, CombatBalance, FighterConfig, WeaponClass } from '@extramundum/shared';
+import type {
+  ArmorClass,
+  CombatBalance,
+  FighterConfig,
+  TraitId,
+  WeaponClass,
+} from '@extramundum/shared';
 
 import { activeModifiers, type StatusInstance } from './statuses.js';
+import { activeTraitModifiers, createTraitState, type TraitState } from './traits.js';
 
 /**
  * Производные величины бойца. GDD §4.2.
@@ -30,6 +37,8 @@ export type FighterState = {
    * ни разу за бой, и это не баланс, а неиграбельность.
    */
   skippedLastTurn: boolean;
+  /** Состояние трейтов в пределах боя: счётчики, стеки, взведённость. */
+  traitStates: Map<TraitId, TraitState>;
 };
 
 /**
@@ -46,7 +55,18 @@ export function maxHp(config: FighterConfig, balance: CombatBalance): number {
 
 export function createFighterState(config: FighterConfig, balance: CombatBalance): FighterState {
   const hp = maxHp(config, balance);
-  return { config, maxHp: hp, hp, initiative: 0, statuses: [], skippedLastTurn: false };
+  const traitStates = new Map<TraitId, TraitState>();
+  for (const id of config.traits) traitStates.set(id, createTraitState());
+
+  return {
+    config,
+    maxHp: hp,
+    hp,
+    initiative: 0,
+    statuses: [],
+    skippedLastTurn: false,
+    traitStates,
+  };
 }
 
 /* ───────────────────────── эффективные значения ──────────────────────── */
@@ -73,35 +93,70 @@ export type EffectiveStats = {
   readonly accuracy: number;
   /** Прибавка к множителю атаки от статусов. 0 — статусов нет. */
   readonly attackMultiplierBonus: number;
+  /** Шаг 0 пайплайна: шанс избежать удар целиком. */
+  readonly avoidChance: number;
+  /** Шаг 2: переопределение силы блока, если трейт его задаёт. */
+  readonly blockReductionOverride: number | undefined;
+  /** Шаг 6: доля игнорируемой брони цели. */
+  readonly armorPenetration: number;
+  /** Множитель шанса крита ПРОТИВНИКА по этому бойцу. */
+  readonly enemyCritMultiplier: number;
+  /** Множители урона от трейтов. */
+  readonly outgoingDamageMultiplier: number;
+  readonly incomingDamageMultiplier: number;
+  /** Прибавка к урону своих эффектов на цели. */
+  readonly dotDamageBonus: number;
+  /** Крит без броска на ближайшем ударе. */
+  readonly guaranteedCrit: boolean;
 };
 
-export function effectiveStats(fighter: FighterState, balance: CombatBalance): EffectiveStats {
+/**
+ * Эффективные значения бойца.
+ *
+ * Складываются три источника: база из конфигурации, модификаторы
+ * активных статусов и пассивы трейтов. Ни один из них не мутируется —
+ * всё считается заново при каждом обращении.
+ *
+ * `opponent` нужен потому, что часть пассивов зависит от цели:
+ * `executioner` сильнее по раненому, `butcher` — по истекающему кровью.
+ * Пассив, смотрящий на противника, — это не исключение, а нормальный
+ * случай в игре про матчапы.
+ */
+export function effectiveStats(
+  fighter: FighterState,
+  opponent: FighterState,
+  balance: CombatBalance,
+): EffectiveStats {
   const base = fighter.config;
+  const sm = fighter.statuses.length > 0 ? activeModifiers(fighter, balance) : {};
+  const tm =
+    base.traits.length > 0
+      ? activeTraitModifiers(fighter, opponent, balance)
+      : ({} as ReturnType<typeof activeTraitModifiers>);
 
-  // Быстрый путь: пока статусов нет, считать нечего.
-  if (fighter.statuses.length === 0) {
-    return {
-      atk: base.atk,
-      agi: base.agi,
-      spd: base.spd,
-      armor: base.armor,
-      accuracy: base.accuracy,
-      attackMultiplierBonus: 0,
-    };
-  }
-
-  const m = activeModifiers(fighter, balance);
+  const atk = Math.max(0, (base.atk + (sm.atk ?? 0) + (tm.atk ?? 0)) * (tm.atkMultiplier ?? 1));
+  const armor = Math.max(
+    0,
+    (base.armor + (sm.armor ?? 0) + (tm.armor ?? 0)) *
+      (sm.armorMultiplier ?? 1) *
+      (tm.armorMultiplier ?? 1),
+  );
 
   return {
-    // Статы не уходят ниже нуля: отрицательная ловкость означала бы
-    // отрицательный шанс уклонения, а отрицательная броня — лечение
-    // от удара.
-    atk: Math.max(0, base.atk + (m.atk ?? 0)),
-    agi: Math.max(0, base.agi + (m.agi ?? 0)),
-    spd: Math.max(0, base.spd + (m.spd ?? 0)),
-    armor: Math.max(0, (base.armor + (m.armor ?? 0)) * (m.armorMultiplier ?? 1)),
-    accuracy: Math.max(0, base.accuracy + (m.accuracy ?? 0)),
-    attackMultiplierBonus: m.attackMultiplierBonus ?? 0,
+    atk,
+    agi: Math.max(0, base.agi + (sm.agi ?? 0) + (tm.agi ?? 0)),
+    spd: Math.max(0, (base.spd + (sm.spd ?? 0) + (tm.spd ?? 0)) * (tm.spdMultiplier ?? 1)),
+    armor,
+    accuracy: Math.max(0, base.accuracy + (sm.accuracy ?? 0) + (tm.accuracy ?? 0)),
+    attackMultiplierBonus: sm.attackMultiplierBonus ?? 0,
+    avoidChance: tm.avoidChance ?? 0,
+    blockReductionOverride: tm.blockReductionOverride,
+    armorPenetration: tm.armorPenetration ?? 0,
+    enemyCritMultiplier: tm.enemyCritMultiplier ?? 1,
+    outgoingDamageMultiplier: tm.outgoingDamageMultiplier ?? 1,
+    incomingDamageMultiplier: tm.incomingDamageMultiplier ?? 1,
+    dotDamageBonus: tm.dotDamageBonus ?? 0,
+    guaranteedCrit: tm.guaranteedCrit ?? false,
   };
 }
 
