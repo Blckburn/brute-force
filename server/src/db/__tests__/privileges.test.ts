@@ -57,6 +57,7 @@ it('в app-role-grants.sql нет команд управления ролями
 
 const DB_URL = process.env['DATABASE_URL'];
 const TEST_ROLE = 'extramundum_privilege_test';
+const BYPASS_ROLE = 'extramundum_bypass_test';
 const TEST_PASSWORD = 'privilege-test-only';
 
 /** Та же база, но под другой ролью: проверять права можно только изнутри. */
@@ -70,6 +71,7 @@ function urlForRole(base: string, role: string, password: string): string {
 describe.skipIf(DB_URL === undefined)('журнал миграций закрыт от роли рантайма', () => {
   let owner: ReturnType<typeof createDatabase>;
   let runtime: ReturnType<typeof createDatabase>;
+  let bypass: ReturnType<typeof createDatabase> | undefined;
   let enabled = false;
 
   beforeAll(async () => {
@@ -102,10 +104,32 @@ describe.skipIf(DB_URL === undefined)('журнал миграций закры�
 
     runtime = createDatabase(urlForRole(DB_URL as string, TEST_ROLE, TEST_PASSWORD));
     enabled = true;
+
+    // Вторая роль — с BYPASSRLS. Атрибут выдаётся только суперпользователем,
+    // поэтому её может не быть даже там, где первая завелась.
+    const canGrantBypass = await owner.db.execute<{ ok: boolean }>(sql`
+      select coalesce(rolsuper, false) as ok from pg_roles where rolname = current_user
+    `);
+    if (canGrantBypass.rows[0]?.ok !== true) return;
+
+    await owner.db.execute(sql`drop role if exists ${sql.identifier(BYPASS_ROLE)}`);
+    await owner.db.execute(
+      sql`create role ${sql.identifier(BYPASS_ROLE)} login bypassrls password ${sql.raw(`'${TEST_PASSWORD}'`)}`,
+    );
+    await owner.db.execute(
+      sql`grant pg_read_all_data, pg_write_all_data to ${sql.identifier(BYPASS_ROLE)}`,
+    );
+
+    bypass = createDatabase(urlForRole(DB_URL as string, BYPASS_ROLE, TEST_PASSWORD));
   }, 60_000);
 
   afterAll(async () => {
     await runtime?.pool.end();
+    await bypass?.pool.end();
+    if (owner !== undefined && bypass !== undefined) {
+      await owner.db.execute(sql`drop owned by ${sql.identifier(BYPASS_ROLE)}`);
+      await owner.db.execute(sql`drop role if exists ${sql.identifier(BYPASS_ROLE)}`);
+    }
     if (owner !== undefined && enabled) {
       await owner.db.execute(
         sql`alter table drizzle.__drizzle_migrations enable row level security`,
@@ -177,6 +201,27 @@ describe.skipIf(DB_URL === undefined)('журнал миграций закры�
     expect(privileges.role).toBe(TEST_ROLE);
     expect(privileges.mayWriteMigrationJournal).toBe(false);
     expect(privileges.isSuperuser).toBe(false);
+  });
+
+  /**
+   * Включённый RLS сам по себе ничего не гарантирует: сквозь него проходят
+   * суперпользователь, владелец таблицы и роль с BYPASSRLS. Проверка вида
+   * «RLS включён, значит закрыто» ответила бы «закрыто» и здесь — а журнал
+   * при этом читается целиком.
+   */
+  it('роль с BYPASSRLS проходит сквозь защиту, и проверка это видит', async () => {
+    if (!enabled || bypass === undefined) return;
+
+    await setRowLevelSecurity(true);
+
+    const seen = await bypass.db.execute<{ n: string }>(
+      sql`select count(*)::text as n from drizzle.__drizzle_migrations`,
+    );
+    expect(Number(seen.rows[0]?.n ?? '0')).toBeGreaterThan(0);
+
+    const privileges = await checkRuntimePrivileges(bypass.db);
+    expect(privileges.role).toBe(BYPASS_ROLE);
+    expect(privileges.mayWriteMigrationJournal).toBe(true);
   });
 
   it('владелец продолжает читать и писать журнал', async () => {
