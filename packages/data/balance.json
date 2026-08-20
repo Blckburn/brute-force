@@ -51,6 +51,26 @@
     "limit": 2000
   },
 
+  "statuses": {
+    "$source": "GDD §4.4 задаёт систему и набор эффектов; §7.5 — числа enrage",
+    "$note": "GDD НЕ ДАЁТ чисел для статусов, кроме enrage. Всё остальное здесь назначено при реализации M1b, чтобы эффекты можно было проверить тестами. Длительности заданы в тиках, как требует §4.4; при SPD около 10 боец ходит раз в 10 тиков, отсюда порядок величин.",
+    "calibration": "pending",
+    "$calibration": "Выверяется матрицей винрейтов §4.6 в M1c: до появления трейтов сравнивать нечего. Не считать эти числа выверенными.",
+
+    "maxInstances": 5,
+
+    "bleed": { "damagePerStack": 3, "duration": 30 },
+    "poison": { "damagePerStack": 2, "duration": 50 },
+    "burn": { "damagePerStack": 6, "duration": 20 },
+    "regen": { "healPerStack": 4, "duration": 30 },
+    "stun": { "duration": 12 },
+    "shield": { "absorbPerStack": 12, "duration": 40 },
+    "hex": { "atkPerStack": -6, "duration": 30 },
+    "fury": { "atkPerStack": 5, "duration": -1 },
+    "chill": { "spdPerStack": -4, "duration": 30 },
+    "enrage": { "attackMultiplierBonus": 0.5, "armorMultiplier": 0.8, "duration": -1 }
+  },
+
   "unarmed": {
     "$source": "M1a",
     "$note": "Оружие бойца без экипировки. Предметов в базе пока нет (лут — M3), а бой без оружия должен считаться, а не падать. Числа намеренно жалкие: голые кулаки не должны выглядеть рабочим билдом.",

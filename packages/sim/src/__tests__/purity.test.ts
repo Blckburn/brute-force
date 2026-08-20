@@ -52,7 +52,7 @@ describe('@extramundum/sim: инварианты пакета', () => {
   it('исходники на месте', () => {
     expect(sources.length).toBeGreaterThan(5);
     expect(SIM_BUNDLE_MARKER).toBe('EXTRAMUNDUM_SIM_MUST_NEVER_REACH_THE_BROWSER');
-    expect(SIM_LOG_VERSION).toBe(1);
+    expect(SIM_LOG_VERSION).toBe(2);
   });
 
   it('не имеет рантайм-зависимостей в манифесте', () => {

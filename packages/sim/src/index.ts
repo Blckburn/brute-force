@@ -40,15 +40,34 @@ export { rngFromSeed, rngFromState, seedToState, type Rng, type RngState } from 
 export {
   atkMultiplier,
   createFighterState,
+  effectiveStats,
   critChance,
   dodgeChance,
   ilvlScale,
   matchupMultiplier,
   maxHp,
   mitigation,
+  type EffectiveStats,
   type FighterState,
 } from './fighter.js';
 export { resolveAttack, type AttackOutcome } from './damage.js';
 export { resolveBattle, LOG_VERSION } from './resolve.js';
-export { tickStatuses, type Status, type StatusContext } from './statuses.js';
+export {
+  applyStatus,
+  absorbDamage,
+  actionPrevented,
+  compareInstances,
+  createStatusClock,
+  orderedStatuses,
+  statusDefinition,
+  tickFighterStatuses,
+  STATUS_ORDER,
+  STATUS_REGISTRY,
+  type StatModifiers,
+  type StatusCategory,
+  type StatusClock,
+  type StatusDefinition,
+  type StatusInstance,
+  type TickResult,
+} from './statuses.js';
 export { TRAITS, type Trait, type TraitContext, type TraitHooks } from './traits.js';

@@ -4,6 +4,7 @@ import {
   atkMultiplier,
   critChance,
   dodgeChance,
+  effectiveStats,
   ilvlScale,
   matchupMultiplier,
   mitigation,
@@ -51,22 +52,28 @@ export function resolveAttack(
 ): AttackOutcome {
   const events: BattleEvent[] = [];
 
+  // Статы читаются ОДИН раз на удар и уже с учётом активных статусов.
+  // Читать `config` напрямую здесь нельзя: тогда hex, fury и chill
+  // существовали бы в описании и не существовали в бою.
+  const att = effectiveStats(attacker, balance);
+  const def = effectiveStats(defender, balance);
+
   // ── Шаг 1. Уклонение. Промах, урона нет.
-  const dodge = dodgeChance(defender.config.agi, attacker.config.accuracy, balance);
+  const dodge = dodgeChance(def.agi, att.accuracy, balance);
   if (rng.chance(dodge)) {
     events.push({ t: 'dodge', actor: defenderIndex, mitigated: 0 });
     return { kind: 'dodged', events };
   }
 
   // ── Шаг 2. Блок. Только если в оффхенде щит.
-  const shield = defender.config.shield;
+  const offhand = defender.config.shield;
   let blockReduction = 0;
   let blocked = false;
-  if (shield !== null) {
+  if (offhand !== null) {
     // Отдельный бросок: см. пункт 5 аудита в шапке файла.
-    if (rng.chance(shield.blockChance)) {
+    if (rng.chance(offhand.blockChance)) {
       blocked = true;
-      blockReduction = shield.blockReduction;
+      blockReduction = offhand.blockReduction;
     }
   }
 
@@ -78,16 +85,16 @@ export function resolveAttack(
   const scale = ilvlScale(weapon.ilvl, balance);
 
   // ── Шаг 4. Множитель ATK.
-  const atkMult = atkMultiplier(attacker.config.atk, balance);
+  const atkMult = atkMultiplier(att.atk, balance, att.attackMultiplierBonus);
 
   // ── Шаг 5. Матчап «класс оружия × класс брони».
   const matchup = matchupMultiplier(weapon.class, defender.config.armorClass, balance);
 
   // ── Шаг 6. Митигация бронёй.
-  const dr = mitigation(defender.config.armor, attacker.config.level, balance);
+  const dr = mitigation(def.armor, attacker.config.level, balance);
 
   // ── Шаг 7. Крит. Тоже отдельный бросок.
-  const crit = rng.chance(critChance(attacker.config.agi, attacker.config.critBonus, balance));
+  const crit = rng.chance(critChance(att.agi, attacker.config.critBonus, balance));
   const critMult = crit ? balance.damage.critMultiplier : 1;
 
   // ── Шаг 8. Эффекты — M1b и M1c. Здесь их нет, и место под них не занято
