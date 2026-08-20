@@ -46,45 +46,66 @@ const ticksOf = (events: readonly BattleEvent[], status: StatusId, target = 0) =
 /* ─────────────────────────────── десять ──────────────────────────────── */
 
 describe('каждый эффект наблюдаем в логе с числом', () => {
-  it('bleed снимает урон за тик, пропорционально стекам', () => {
-    const { log } = withStatus([{ id: 'bleed', stacks: 3, duration: 5 }]);
+  /**
+   * Сколько раз периодический эффект сработает за `duration` тиков.
+   * Первое срабатывание — на нулевом возрасте, поэтому это потолок.
+   */
+  const expectedTicks = (duration: number, period: number) => Math.ceil(duration / period);
+
+  it('bleed снимает урон раз в период, пропорционально стекам', () => {
+    const { tickEvery, damagePerStack } = balance.statuses.bleed;
+    const duration = tickEvery * 5;
+    const { log } = withStatus([{ id: 'bleed', stacks: 3, duration }]);
     const ticks = ticksOf(log.events, 'bleed');
 
-    expect(ticks).toHaveLength(5);
+    expect(ticks).toHaveLength(expectedTicks(duration, tickEvery));
     for (const e of ticks) {
-      expect(e.t === 'status_tick' && e.amount).toBe(balance.statuses.bleed.damagePerStack * 3);
+      expect(e.t === 'status_tick' && e.amount).toBe(damagePerStack * 3);
     }
   });
 
-  it('poison снимает урон за тик', () => {
-    const { log } = withStatus([{ id: 'poison', stacks: 2, duration: 4 }]);
+  it('период настоящий: за те же тики срабатываний строго меньше', () => {
+    // Проверка ПРОТИВ вырождения. «Раз в десять тиков» и «каждый тик»
+    // различаются только числом срабатываний на одном отрезке; без этой
+    // пары тест выше был бы зелёным и при периоде, равном единице.
+    const { tickEvery } = balance.statuses.bleed;
+    expect(tickEvery, 'период равен единице — сравнивать не с чем').toBeGreaterThan(1);
+
+    const duration = tickEvery * 4;
+    const ticks = ticksOf(withStatus([{ id: 'bleed', stacks: 1, duration }]).log.events, 'bleed');
+
+    expect(ticks.length).toBe(4);
+    expect(ticks.length).toBeLessThan(duration);
+  });
+
+  it('poison снимает урон раз в период', () => {
+    const { tickEvery, damagePerStack } = balance.statuses.poison;
+    const duration = tickEvery * 4;
+    const { log } = withStatus([{ id: 'poison', stacks: 2, duration }]);
     const ticks = ticksOf(log.events, 'poison');
 
-    expect(ticks).toHaveLength(4);
-    expect(ticks[0]?.t === 'status_tick' && ticks[0].amount).toBe(
-      balance.statuses.poison.damagePerStack * 2,
-    );
+    expect(ticks).toHaveLength(expectedTicks(duration, tickEvery));
+    expect(ticks[0]?.t === 'status_tick' && ticks[0].amount).toBe(damagePerStack * 2);
   });
 
-  it('burn снимает урон за тик и сильнее яда на стек', () => {
-    const { log } = withStatus([{ id: 'burn', stacks: 1, duration: 3 }]);
+  it('burn снимает урон раз в период и сильнее яда на стек', () => {
+    const { tickEvery, damagePerStack } = balance.statuses.burn;
+    const duration = tickEvery * 3;
+    const { log } = withStatus([{ id: 'burn', stacks: 1, duration }]);
     const ticks = ticksOf(log.events, 'burn');
 
-    expect(ticks).toHaveLength(3);
-    expect(ticks[0]?.t === 'status_tick' && ticks[0].amount).toBe(
-      balance.statuses.burn.damagePerStack,
-    );
-    expect(balance.statuses.burn.damagePerStack).toBeGreaterThan(
-      balance.statuses.poison.damagePerStack,
-    );
+    expect(ticks).toHaveLength(expectedTicks(duration, tickEvery));
+    expect(ticks[0]?.t === 'status_tick' && ticks[0].amount).toBe(damagePerStack);
+    expect(damagePerStack).toBeGreaterThan(balance.statuses.poison.damagePerStack);
   });
 
-  it('regen лечит за тик и не поднимает выше максимума', () => {
+  it('regen лечит раз в период и не поднимает выше максимума', () => {
+    const { tickEvery, healPerStack } = balance.statuses.regen;
     const state = createFighterState(fighter({ atk: 0, spd: 1 }), balance);
     const clock = createStatusClock();
-    applyStatus(state, 0, 'regen', 2, 6, balance, clock);
+    applyStatus(state, 0, 'regen', 2, tickEvery * 6, balance, clock);
 
-    const perTick = balance.statuses.regen.healPerStack * 2;
+    const perTick = healPerStack * 2;
     state.hp = state.maxHp - perTick - 5;
 
     const first = tickFighterStatuses(state, 0, balance, STATUS_ORDER);
@@ -92,7 +113,11 @@ describe('каждый эффект наблюдаем в логе с число
     const healed = first.events.find((e) => e.t === 'status_tick' && e.status === 'regen');
     expect(healed?.t === 'status_tick' && healed.amount).toBe(perTick);
 
-    // Второй тик упирается в максимум и не переливает через край.
+    // Внутри периода лечения нет — и HP это подтверждает, а не догадка.
+    for (let i = 1; i < tickEvery; i++) tickFighterStatuses(state, 0, balance, STATUS_ORDER);
+    expect(state.hp).toBe(state.maxHp - 5);
+
+    // Следующий период снова лечит и упирается в максимум.
     tickFighterStatuses(state, 0, balance, STATUS_ORDER);
     expect(state.hp).toBe(state.maxHp);
   });
@@ -328,6 +353,69 @@ describe('кровотечение и яд: независимые экземп�
     expect(state.statuses.filter((i) => i.id === 'bleed')).toHaveLength(
       balance.statuses.maxInstances,
     );
+  });
+});
+
+describe('стеки ограничены сверху', () => {
+  it('обновляемый эффект не копит стеки без предела', () => {
+    const { maxStacks } = balance.statuses.chill;
+    const victim = createFighterState(fighter({ spd: 30 }), balance);
+    const clock = createStatusClock();
+
+    // По одному стеку, много раз: так их накладывает трейт на каждом ударе.
+    const seen: number[] = [];
+    for (let i = 0; i < maxStacks + 8; i++) {
+      applyStatus(victim, 0, 'chill', 1, 0, balance, clock);
+      seen.push(victim.statuses[0]?.stacks ?? 0);
+    }
+
+    // Стеки РОСЛИ, а потом упёрлись. Без первой половины проверка
+    // «не больше капа» проходила бы и при неработающем наложении.
+    expect(seen[0]).toBe(1);
+    expect(Math.max(...seen)).toBe(maxStacks);
+    expect(maxStacks, 'кап равен единице — рост наблюдать не на чем').toBeGreaterThan(1);
+    expect(seen[maxStacks - 1]).toBe(maxStacks);
+    expect(seen.at(-1)).toBe(maxStacks);
+  });
+
+  it('без капа замедление обнулило бы SPD — а с ним боец продолжает ходить', () => {
+    const { minSpd } = balance.tick;
+    const { maxStacks, spdPerStack } = balance.statuses.chill;
+    const base = 12;
+
+    const victim = createFighterState(fighter({ spd: base }), balance);
+    const clock = createStatusClock();
+    for (let i = 0; i < maxStacks + 5; i++) applyStatus(victim, 0, 'chill', 1, 0, balance, clock);
+
+    const spd = effectiveStats(victim, dummy(), balance).spd;
+    expect(spd).toBe(base + spdPerStack * maxStacks);
+    expect(spd, 'замедленный боец обязан продолжать ходить').toBeGreaterThanOrEqual(minSpd);
+    expect(spd, 'замедление ничего не сняло — проверять нечего').toBeLessThan(base);
+  });
+
+  it('пол по SPD держит бойца в бою при любом замедлении', () => {
+    const { minSpd } = balance.tick;
+    const { spdPerStack, maxStacks } = balance.statuses.chill;
+
+    // База подобрана так, чтобы СЫРАЯ величина ушла НИЖЕ пола. Иначе
+    // проверка проходит и без пола: `max(0, x)` и `max(minSpd, x)`
+    // дают одно и то же, пока x выше обоих, и тест ничего не доказывает.
+    const base = 1;
+    const raw = base + spdPerStack * maxStacks;
+    expect(raw, 'замедление не уводит ниже пола — пол проверять нечем').toBeLessThan(minSpd);
+
+    const frozen = createFighterState(fighter({ spd: base }), balance);
+    const clock = createStatusClock();
+    for (let i = 0; i < maxStacks + 20; i++) applyStatus(frozen, 0, 'chill', 1, 0, balance, clock);
+
+    expect(effectiveStats(frozen, dummy(), balance).spd).toBe(minSpd);
+
+    // И это не арифметика на стенде: в настоящем бою ходы есть.
+    const chilled = withStatus([{ id: 'chill', stacks: maxStacks + 20, duration: -1 }], {
+      spd: base,
+    });
+    const turns = chilled.log.events.filter((e) => e.t === 'turn_start' && e.actor === 0).length;
+    expect(turns, 'замедленный до предела боец не сделал ни одного хода').toBeGreaterThan(0);
   });
 });
 

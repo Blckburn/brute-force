@@ -246,11 +246,18 @@ const STR: readonly Trait[] = [
   {
     id: 'bloodlust',
     school: 'str',
+    // Бросок, а не «на каждом ударе». Безусловное наложение статуса
+    // на КАЖДОМ попадании выходит за рамки школы: соседи требуют либо
+    // крита, либо своего броска. Матрица показала это как 80% побед
+    // против 52–65% у остальных STR.
     hooks: {
-      onHit: (ctx) => [
-        fired(ctx, 'bloodlust'),
-        ...inflict(ctx, 'opponent', 'bleed', num(ctx.balance, 'bloodlust', 'bleedStacks')),
-      ],
+      onHit: (ctx) =>
+        ctx.rng.chance(num(ctx.balance, 'bloodlust', 'chance'))
+          ? [
+              fired(ctx, 'bloodlust'),
+              ...inflict(ctx, 'opponent', 'bleed', num(ctx.balance, 'bloodlust', 'bleedStacks')),
+            ]
+          : [],
     },
   },
   {
@@ -509,11 +516,21 @@ const MAG: readonly Trait[] = [
     id: 'plaguebearer',
     school: 'mag',
     anchor: true,
+    // Тот же бросок и по той же причине, что у `bloodlust`: безусловный
+    // яд на каждом попадании брал 96% побед у своего же архетипа.
     hooks: {
-      onHit: (ctx) => [
-        fired(ctx, 'plaguebearer'),
-        ...inflict(ctx, 'opponent', 'poison', num(ctx.balance, 'plaguebearer', 'poisonStacks')),
-      ],
+      onHit: (ctx) =>
+        ctx.rng.chance(num(ctx.balance, 'plaguebearer', 'chance'))
+          ? [
+              fired(ctx, 'plaguebearer'),
+              ...inflict(
+                ctx,
+                'opponent',
+                'poison',
+                num(ctx.balance, 'plaguebearer', 'poisonStacks'),
+              ),
+            ]
+          : [],
     },
   },
   {
@@ -555,10 +572,13 @@ const MAG: readonly Trait[] = [
     id: 'frostbite',
     school: 'mag',
     hooks: {
-      onHit: (ctx) => [
-        fired(ctx, 'frostbite'),
-        ...inflict(ctx, 'opponent', 'chill', num(ctx.balance, 'frostbite', 'chillStacks')),
-      ],
+      onHit: (ctx) =>
+        ctx.rng.chance(num(ctx.balance, 'frostbite', 'chance'))
+          ? [
+              fired(ctx, 'frostbite'),
+              ...inflict(ctx, 'opponent', 'chill', num(ctx.balance, 'frostbite', 'chillStacks')),
+            ]
+          : [],
     },
   },
   {

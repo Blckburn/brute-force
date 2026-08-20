@@ -258,6 +258,14 @@ const matchupRowSchema = z.object({
   heavy: z.number(),
 });
 
+/** Периодический урон: три эффекта с одинаковой формой (bleed/poison/burn). */
+const dot = z.object({
+  damagePerStack: z.number(),
+  duration: z.int(),
+  tickEvery: z.int().min(1),
+  maxStacks: z.int().min(1),
+});
+
 export const combatBalanceSchema = z.object({
   damage: z.object({
     atkDivisor: z.number().positive(),
@@ -309,26 +317,50 @@ export const combatBalanceSchema = z.object({
   statuses: z.object({
     /** Кап экземпляров одного статуса на бойце. Защита от бесконечного стака. */
     maxInstances: z.int().positive(),
-    bleed: z.object({ damagePerStack: z.number(), duration: z.int() }),
-    poison: z.object({ damagePerStack: z.number(), duration: z.int() }),
-    burn: z.object({ damagePerStack: z.number(), duration: z.int() }),
-    regen: z.object({ healPerStack: z.number(), duration: z.int() }),
-    stun: z.object({ duration: z.int() }),
-    shield: z.object({ absorbPerStack: z.number(), duration: z.int() }),
-    hex: z.object({ atkPerStack: z.number(), duration: z.int() }),
-    fury: z.object({ atkPerStack: z.number(), duration: z.int() }),
-    chill: z.object({ spdPerStack: z.number(), duration: z.int() }),
+    // `tickEvery` — период в тиках. Он обязателен, а не опционален
+    // с умолчанием: единица означала бы «каждый тик», а это в десять
+    // раз сильнее удара, и забытое поле молча вернуло бы тот перекос.
+    // `maxStacks` обязателен у всех десяти: обновляемым эффектам он
+    // единственная защита от накопления, а `maxInstances` их не касается.
+    bleed: dot,
+    poison: dot,
+    burn: dot,
+    regen: z.object({
+      healPerStack: z.number(),
+      duration: z.int(),
+      tickEvery: z.int().min(1),
+      maxStacks: z.int().min(1),
+    }),
+    stun: z.object({ duration: z.int(), maxStacks: z.int().min(1) }),
+    shield: z.object({
+      absorbPerStack: z.number(),
+      duration: z.int(),
+      maxStacks: z.int().min(1),
+    }),
+    hex: z.object({ atkPerStack: z.number(), duration: z.int(), maxStacks: z.int().min(1) }),
+    fury: z.object({ atkPerStack: z.number(), duration: z.int(), maxStacks: z.int().min(1) }),
+    chill: z.object({ spdPerStack: z.number(), duration: z.int(), maxStacks: z.int().min(1) }),
     enrage: z.object({
       /** Прибавка к множителю атаки: 0.5 значит ×1.5 урона (GDD §7.5). */
       attackMultiplierBonus: z.number(),
       /** Множитель брони: 0.8 значит −20% защиты (GDD §7.5). */
       armorMultiplier: z.number(),
       duration: z.int(),
+      maxStacks: z.int().min(1),
     }),
   }),
   tick: z.object({
     initiativeThreshold: z.number().positive(),
     limit: z.int().positive(),
+    /**
+     * Нижняя граница SPD. Замедленный боец обязан продолжать ходить.
+     *
+     * Ноль означал бы вечную заморозку — контроль без выхода, ровно то,
+     * от чего GDD §4.4 защищает стан жёстким правилом. Без этой границы
+     * `chill`, накладываемый каждым ударом, уводил SPD цели в ноль,
+     * и трейт `frostbite` брал сто процентов побед.
+     */
+    minSpd: z.number().positive(),
   }),
 
   /**

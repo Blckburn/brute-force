@@ -99,6 +99,20 @@ function afflicted(config: Partial<FighterConfig>, status: 'bleed', stacks: numb
   return state;
 }
 
+/**
+ * Мешок, ГАРАНТИРОВАННО носящий щит весь бой.
+ *
+ * Через `bulwark` не годится: у щита конечная длительность, и в длинном
+ * бою он истекает раньше, чем `siphon` успевает бросить свои проценты.
+ * Тогда тест падал бы не потому, что трейт сломан, а потому, что срывать
+ * было нечего — то есть проверял бы длительность щита, а не срыв.
+ */
+const shielded = (extra: Array<{ id: 'hex'; stacks: number; duration: number }> = []) =>
+  dummy({
+    pathBonusHp: 3000,
+    statuses: [{ id: 'shield', stacks: 6, duration: -1 }, ...extra],
+  });
+
 /** Эффективные статы бойца с набором трейтов против заданного противника. */
 function stats(self: Partial<FighterConfig>, opponent: Partial<FighterConfig> = {}) {
   const a = createFighterState(fighter(self), balance);
@@ -212,8 +226,10 @@ describe('шесть трейтов из аудита v1.0 делают ровн
     expect(paid).toBeLessThanOrEqual(cost);
 
     // Каждой плате соответствует урон по себе в логе — иначе трейт
-    // «тратит HP» только в примечании, как в v1.0.
-    const selfHits = log.events.filter((e) => e.t === 'damage' && e.target === 0);
+    // «тратит HP» только в примечании, как в v1.0. Нулевые удары мешка
+    // отброшены: у него нет оружия, но ходы есть, и его промахи попали бы
+    // в ту же выборку.
+    const selfHits = log.events.filter((e) => e.t === 'damage' && e.target === 0 && e.amount > 0);
     expect(selfHits.length).toBe(turns.length);
   });
 
@@ -479,11 +495,7 @@ describe('каждый трейт наблюдаем', () => {
         .length > 0,
     siphon: () => {
       for (let i = 0; i < 60; i++) {
-        const { log } = fight(
-          striker({ traits: ['siphon'], atk: 5 }),
-          dummy({ traits: ['bulwark'], pathBonusHp: 3000 }),
-          `siphon-${i}`,
-        );
+        const { log } = fight(striker({ traits: ['siphon'], atk: 5 }), shielded(), `siphon-${i}`);
         if (fires(log.events, 'siphon').length > 0) return true;
       }
       return false;
@@ -532,17 +544,30 @@ describe('STR', () => {
     expect(effectiveStats(self, wounded, balance).outgoingDamageMultiplier).toBe(mult);
   });
 
-  it('bloodlust накладывает кровотечение на каждом попадании', () => {
+  it('bloodlust вызывает кровотечение с заявленным шансом', () => {
+    const chance = T('bloodlust', 'chance');
     const stacks = T('bloodlust', 'bleedStacks');
-    const { log } = fight(striker({ traits: ['bloodlust'] }), dummy(), 'bloodlust');
-    // Смертельный удар статус не вешает: `inflict` не трогает труп.
-    // Считаем удары, после которых цель осталась жива.
-    const hits = log.events.filter((e) => e.t === 'damage' && e.target === 1 && e.hpAfter > 0);
-    const bleeds = applies(log.events, 'bleed', 1);
 
-    expect(hits.length).toBeGreaterThan(3);
-    expect(bleeds.length).toBe(hits.length);
-    expect(bleeds[0]?.t === 'status_apply' && bleeds[0].stacks).toBe(stacks);
+    let hits = 0;
+    let bleeds = 0;
+    let firstStacks = 0;
+    for (let i = 0; i < 200; i++) {
+      const { log } = fight(
+        striker({ traits: ['bloodlust'], atk: 5 }),
+        dummy({ pathBonusHp: 3000 }),
+        `bloodlust-${i}`,
+      );
+      // Смертельный удар статус не вешает: `inflict` не трогает труп.
+      hits += log.events.filter((e) => e.t === 'damage' && e.target === 1 && e.hpAfter > 0).length;
+      const applied = fires(log.events, 'bloodlust', 0);
+      bleeds += applied.length;
+      const first = applies(log.events, 'bleed', 1)[0];
+      if (firstStacks === 0 && first?.t === 'status_apply') firstStacks = first.stacks;
+    }
+
+    expect(hits).toBeGreaterThan(1000);
+    expect(bleeds / hits).toBeCloseTo(chance, 2);
+    expect(firstStacks).toBe(stacks);
   });
 
   it('berserker растёт линейно к нулю HP и равен единице на полном', () => {
@@ -843,12 +868,22 @@ describe('AGI', () => {
 });
 
 describe('MAG', () => {
-  it('plaguebearer травит на каждом попадании', () => {
-    const { log } = fight(striker({ traits: ['plaguebearer'] }), dummy(), 'plague');
-    // Смертельный удар яд не вешает — травить труп незачем.
-    const hits = log.events.filter((e) => e.t === 'damage' && e.target === 1 && e.hpAfter > 0);
-    expect(hits.length).toBeGreaterThan(3);
-    expect(applies(log.events, 'poison', 1).length).toBe(hits.length);
+  it('plaguebearer травит с заявленным шансом', () => {
+    const chance = T('plaguebearer', 'chance');
+    let hits = 0;
+    let poisons = 0;
+    for (let i = 0; i < 200; i++) {
+      const { log } = fight(
+        striker({ traits: ['plaguebearer'], atk: 5 }),
+        dummy({ pathBonusHp: 3000 }),
+        `plague-${i}`,
+      );
+      hits += log.events.filter((e) => e.t === 'damage' && e.target === 1 && e.hpAfter > 0).length;
+      poisons += fires(log.events, 'plaguebearer', 0).length;
+    }
+
+    expect(hits).toBeGreaterThan(1000);
+    expect(poisons / hits).toBeCloseTo(chance, 2);
   });
 
   it('amplifier усиливает СВОИ эффекты и не усиливает чужие', () => {
@@ -989,11 +1024,7 @@ describe('MAG', () => {
     for (let i = 0; i < 80; i++) {
       const { log } = fight(
         striker({ traits: ['siphon'], atk: 5 }),
-        dummy({
-          traits: ['bulwark'],
-          pathBonusHp: 3000,
-          statuses: [{ id: 'hex', stacks: 1, duration: 900 }],
-        }),
+        shielded([{ id: 'hex', stacks: 1, duration: 900 }]),
         `siphon-${i}`,
       );
       for (const e of log.events) {
@@ -1178,13 +1209,33 @@ describe('описания сверены с реализацией', () => {
       ['warlord', 'atkPerKill', T('warlord', 'atkPerKill')],
       ['cursed', 'atkMultiplier', T('cursed', 'atkMultiplier')],
       ['cursed', 'hpPerTurn', T('cursed', 'hpPerTurn')],
-      ['thorns', 'reflectFraction', T('thorns', 'reflectFraction') * 100],
-      ['phantom', 'avoidChance', T('phantom', 'avoidChance') * 100],
-      ['hexblade', 'chance', T('hexblade', 'chance') * 100],
+      ['executioner', 'hpThreshold', T('executioner', 'hpThreshold') * 100],
+      ['executioner', 'damageMultiplier', T('executioner', 'damageMultiplier')],
+      ['bloodlust', 'chance', T('bloodlust', 'chance') * 100],
+      ['berserker', 'maxBonus', T('berserker', 'maxBonus') * 100],
       ['ironGrip', 'armorPenetration', T('ironGrip', 'armorPenetration') * 100],
+      ['butcher', 'damageBonusVsBleeding', T('butcher', 'damageBonusVsBleeding') * 100],
+      ['thorns', 'reflectFraction', T('thorns', 'reflectFraction') * 100],
+      ['secondWind', 'hpThreshold', T('secondWind', 'hpThreshold') * 100],
+      ['bulwark', 'shieldStacks', T('bulwark', 'shieldStacks')],
+      ['stoneskin', 'armorMultiplier', (T('stoneskin', 'armorMultiplier') - 1) * 100],
       ['hardened', 'armor', T('hardened', 'armor')],
-      ['deadeye', 'accuracy', T('deadeye', 'accuracy')],
+      ['phantom', 'avoidChance', T('phantom', 'avoidChance') * 100],
       ['windup', 'everyNTurns', T('windup', 'everyNTurns')],
+      ['windup', 'damageMultiplier', T('windup', 'damageMultiplier')],
+      ['riposte', 'bleedStacks', T('riposte', 'bleedStacks')],
+      ['quickstep', 'spdMultiplier', (T('quickstep', 'spdMultiplier') - 1) * 100],
+      ['deadeye', 'accuracy', T('deadeye', 'accuracy')],
+      ['bleedout', 'bleedStacks', T('bleedout', 'bleedStacks')],
+      ['hexblade', 'chance', T('hexblade', 'chance') * 100],
+      ['plaguebearer', 'chance', T('plaguebearer', 'chance') * 100],
+      ['amplifier', 'dotDamageBonus', T('amplifier', 'dotDamageBonus') * 100],
+      ['leech', 'healFraction', T('leech', 'healFraction') * 100],
+      ['frostbite', 'chance', T('frostbite', 'chance') * 100],
+      ['siphon', 'chance', T('siphon', 'chance') * 100],
+      ['innateThief', 'damagePerConsecutiveHit', T('innateThief', 'damagePerConsecutiveHit') * 100],
+      ['innateGuard', 'firstHitReduction', T('innateGuard', 'firstHitReduction') * 100],
+      ['innateScholar', 'extraDuration', T('innateScholar', 'extraDuration')],
     ];
 
     for (const [id, key, value] of claims) {

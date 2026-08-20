@@ -45,6 +45,15 @@ export type StatusInstance = {
   stacks: number;
   /** В тиках. -1 — до конца боя, вниз не тикает. */
   duration: number;
+  /**
+   * Сколько тиков прожил экземпляр. Нужен эффектам с ПЕРИОДОМ.
+   *
+   * Кровотечение, снимающее свой урон каждый тик, несоизмеримо сильнее
+   * удара: боец при SPD около десяти действует раз в десять тиков,
+   * то есть эффект успевает сработать десять раз между двумя ударами.
+   * Периодичность возвращает эти величины в один масштаб.
+   */
+  age: number;
   /** Порядок наложения. Разрешает ничью при сортировке. */
   readonly seq: number;
   /**
@@ -110,10 +119,27 @@ export type StatusDefinition = {
   /** Длительность по умолчанию при наложении, из данных. */
   defaultDuration(balance: CombatBalance): number;
 
+  /**
+   * Потолок стеков одного экземпляра, из данных.
+   *
+   * Нужен именно обновляемым эффектам. `maxInstances` ограничивает число
+   * ЭКЗЕМПЛЯРОВ и на них не действует вовсе: обновление складывает стеки
+   * в единственный экземпляр, и без потолка `chill` за десяток ударов
+   * уводил SPD цели в ноль, а `hex` — её ATK. Матрица винрейтов показала
+   * это как стопроцентную победу двух трейтов из тридцати.
+   */
+  maxStacks(balance: CombatBalance): number;
+
   /** Прибавки к статам, пока активен. Чистая функция. */
   modify?(instance: StatusInstance, balance: CombatBalance): StatModifiers;
 
-  /** Урон или лечение за тик. `null` — в этот тик ничего не даёт. */
+  /**
+   * Урон или лечение за тик. `null` — в этот тик ничего не даёт.
+   *
+   * Возврат `null` — не запасной случай, а рабочий: именно им выражается
+   * период. Отдельной ветки в цикле боя для «а этот эффект тикает реже»
+   * нет и не должно быть.
+   */
   tick?(instance: StatusInstance, balance: CombatBalance): TickResult | null;
 
   /** Запрещает бойцу действовать в этот ход. */
@@ -129,18 +155,39 @@ export type StatusDefinition = {
 
 /* ──────────────────────────── реестр эффектов ────────────────────────── */
 
+/**
+ * Периодический эффект: срабатывает раз в `tickEvery` тиков.
+ *
+ * Период задан данными, а не кодом. Единица означает «каждый тик» —
+ * то есть прежнее поведение, если оно однажды понадобится.
+ */
+function periodic(inst: StatusInstance, tickEvery: number): boolean {
+  const period = Math.max(1, Math.round(tickEvery));
+  return inst.age % period === 0;
+}
+
 /** Урон за тик, пропорциональный стекам. Общая форма для bleed/poison/burn. */
 function damageOverTime(
   id: StatusId,
   stacking: 'instances' | 'refresh',
-  read: (b: CombatBalance) => { damagePerStack: number; duration: number },
+  read: (b: CombatBalance) => {
+    damagePerStack: number;
+    duration: number;
+    tickEvery: number;
+    maxStacks: number;
+  },
 ): StatusDefinition {
   return {
     id,
     category: 'damage',
     stacking,
     defaultDuration: (b) => read(b).duration,
-    tick: (inst, b) => ({ kind: 'damage', amount: read(b).damagePerStack * inst.stacks }),
+    maxStacks: (b) => read(b).maxStacks,
+    tick: (inst, b) => {
+      const { damagePerStack, tickEvery } = read(b);
+      if (!periodic(inst, tickEvery)) return null;
+      return { kind: 'damage', amount: damagePerStack * inst.stacks };
+    },
   };
 }
 
@@ -156,6 +203,7 @@ const DEFINITIONS: readonly StatusDefinition[] = [
     category: 'control',
     stacking: 'refresh',
     defaultDuration: (b) => b.statuses.stun.duration,
+    maxStacks: (b) => b.statuses.stun.maxStacks,
     preventsAction: () => true,
   },
 
@@ -164,6 +212,7 @@ const DEFINITIONS: readonly StatusDefinition[] = [
     category: 'modifier',
     stacking: 'refresh',
     defaultDuration: (b) => b.statuses.hex.duration,
+    maxStacks: (b) => b.statuses.hex.maxStacks,
     modify: (inst, b) => ({ atk: b.statuses.hex.atkPerStack * inst.stacks }),
   },
 
@@ -172,6 +221,7 @@ const DEFINITIONS: readonly StatusDefinition[] = [
     category: 'modifier',
     stacking: 'refresh',
     defaultDuration: (b) => b.statuses.fury.duration,
+    maxStacks: (b) => b.statuses.fury.maxStacks,
     modify: (inst, b) => ({ atk: b.statuses.fury.atkPerStack * inst.stacks }),
   },
 
@@ -180,7 +230,11 @@ const DEFINITIONS: readonly StatusDefinition[] = [
     category: 'heal',
     stacking: 'refresh',
     defaultDuration: (b) => b.statuses.regen.duration,
-    tick: (inst, b) => ({ kind: 'heal', amount: b.statuses.regen.healPerStack * inst.stacks }),
+    maxStacks: (b) => b.statuses.regen.maxStacks,
+    tick: (inst, b) =>
+      periodic(inst, b.statuses.regen.tickEvery)
+        ? { kind: 'heal', amount: b.statuses.regen.healPerStack * inst.stacks }
+        : null,
   },
 
   {
@@ -188,6 +242,7 @@ const DEFINITIONS: readonly StatusDefinition[] = [
     category: 'absorb',
     stacking: 'refresh',
     defaultDuration: (b) => b.statuses.shield.duration,
+    maxStacks: (b) => b.statuses.shield.maxStacks,
     absorb: (inst, incoming, b) => {
       const perStack = b.statuses.shield.absorbPerStack;
       const capacity = perStack * inst.stacks;
@@ -205,6 +260,7 @@ const DEFINITIONS: readonly StatusDefinition[] = [
     category: 'modifier',
     stacking: 'refresh',
     defaultDuration: (b) => b.statuses.enrage.duration,
+    maxStacks: (b) => b.statuses.enrage.maxStacks,
     modify: (_inst, b) => ({
       attackMultiplierBonus: b.statuses.enrage.attackMultiplierBonus,
       armorMultiplier: b.statuses.enrage.armorMultiplier,
@@ -216,6 +272,7 @@ const DEFINITIONS: readonly StatusDefinition[] = [
     category: 'modifier',
     stacking: 'refresh',
     defaultDuration: (b) => b.statuses.chill.duration,
+    maxStacks: (b) => b.statuses.chill.maxStacks,
     modify: (inst, b) => ({ spd: b.statuses.chill.spdPerStack * inst.stacks }),
   },
 ];
@@ -368,11 +425,16 @@ export function applyStatus(
   // это признак, а не число тиков, и прибавка к нему дала бы 0.
   const finalDuration = base === -1 ? -1 : base + source.durationBonus;
 
+  const cap = def.maxStacks(balance);
+
   if (def.stacking === 'refresh') {
     const existing = fighter.statuses.find((i) => i.id === id);
     if (existing !== undefined) {
-      existing.stacks += stacks;
+      existing.stacks = Math.min(cap, existing.stacks + stacks);
       existing.duration = finalDuration;
+      // Обновление начинает период заново: удар, обновивший горение,
+      // обязан что-то сделать, а не попасть в паузу чужого таймера.
+      existing.age = 0;
       // Обновление перенимает источник последнего наложения: усиление
       // относится к удару, который его обновил.
       existing.damageBonus = source.dotDamageBonus;
@@ -412,8 +474,9 @@ export function applyStatus(
   const instance: StatusInstance = {
     instance: clock.nextInstance++,
     id,
-    stacks,
+    stacks: Math.min(cap, stacks),
     duration: finalDuration,
+    age: 0,
     seq: clock.nextSeq++,
     damageBonus: source.dotDamageBonus,
   };
@@ -555,8 +618,10 @@ export function tickFighterStatuses(
   }
 
   // Длительность убывает ПОСЛЕ действия: статус, наложенный на 1 тик,
-  // обязан сработать один раз, а не ноль.
+  // обязан сработать один раз, а не ноль. По той же причине возраст
+  // растёт здесь же: на нулевом возрасте периодический эффект сработал.
   for (const inst of [...fighter.statuses]) {
+    inst.age += 1;
     if (inst.duration === -1) continue;
     inst.duration -= 1;
     if (inst.duration <= 0) events.push(...removeInstance(fighter, target, inst));

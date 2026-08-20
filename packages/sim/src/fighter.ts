@@ -145,7 +145,14 @@ export function effectiveStats(
   return {
     atk,
     agi: Math.max(0, base.agi + (sm.agi ?? 0) + (tm.agi ?? 0)),
-    spd: Math.max(0, (base.spd + (sm.spd ?? 0) + (tm.spd ?? 0)) * (tm.spdMultiplier ?? 1)),
+    // Пол по SPD, а не ноль: замедленный боец обязан продолжать ходить.
+    // Ноль — это вечная заморозка, контроль без выхода; GDD §4.4 такой
+    // случай запрещает для стана жёстким правилом, и для замедления
+    // он не менее плох.
+    spd: Math.max(
+      balance.tick.minSpd,
+      (base.spd + (sm.spd ?? 0) + (tm.spd ?? 0)) * (tm.spdMultiplier ?? 1),
+    ),
     armor,
     accuracy: Math.max(0, base.accuracy + (sm.accuracy ?? 0) + (tm.accuracy ?? 0)),
     attackMultiplierBonus: sm.attackMultiplierBonus ?? 0,
