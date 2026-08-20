@@ -15,7 +15,26 @@ const envSchema = z.object({
   DATABASE_URL: z.string().min(1, 'DATABASE_URL обязателен'),
 
   BETTER_AUTH_SECRET: z.string().min(32, 'BETTER_AUTH_SECRET должен быть не короче 32 символов'),
-  BETTER_AUTH_URL: z.url(),
+  /**
+   * Адрес, по которому Better Auth сопоставляет входящие запросы:
+   * baseURL + basePath должны равняться пути, который ВИДИТ СЕРВЕР.
+   *
+   * Только origin, без пути. Причина не в аккуратности: статика снимает
+   * префикс `/api` при проксировании, и до сервера доходит `/auth/...`.
+   * Если сюда записать адрес клиента вместе с `/api`, Better Auth станет
+   * ждать `/api/auth/...`, не найдёт совпадения и ответит 404 на вход —
+   * молча, потому что 404 не ошибка. Ровно это и случилось на проде.
+   */
+  BETTER_AUTH_URL: z.url().refine(
+    (v) => {
+      const { pathname } = new URL(v);
+      return pathname === '/' || pathname === '';
+    },
+    {
+      message:
+        'BETTER_AUTH_URL должен быть только origin, без пути: сервер получает запросы на /auth, а не на /api/auth',
+    },
+  ),
 
   /** Через запятую. Origin-ы клиента, которым разрешены запросы с куками. */
   CORS_ORIGINS: z
