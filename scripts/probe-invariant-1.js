@@ -19,10 +19,15 @@
  * закрыт политикой egress. Поэтому скрипт написан для запуска человеком.
  */
 (async () => {
+  // Клиент ходит на относительный /api: статика проксирует его на сервер,
+  // и браузер видит один домен. Поэтому по умолчанию проверяем свой же
+  // origin — так проверяется ровно та схема, что работает у игрока.
+  //
+  // Прямой адрес сервера сюда подставлять не надо: обращение к нему
+  // с чужого домена проверяло бы другую конфигурацию, с посторонней кукой.
   const API = window.__API__ || document.querySelector('meta[name="api-url"]')?.content;
-  const guess = API || prompt('URL сервера (например https://extramundum-server.onrender.com)');
-  if (!guess) return console.error('Нужен URL сервера');
-  const base = guess.replace(/\/+$/, '');
+  const base = (API || `${window.location.origin}/api`).replace(/\/+$/, '');
+  console.info('проверяю', base);
 
   const rows = [];
   const add = (what, result) =>
