@@ -17,5 +17,8 @@
   "scripts": {
     "build": "tsc --build",
     "test": "vitest run"
+  },
+  "devDependencies": {
+    "@extramundum/shared": "workspace:*"
   }
 }

@@ -1,11 +1,17 @@
 /**
  * @extramundum/sim — детерминированный боевой движок.
  *
- * ЭТАП M0: пакет намеренно пуст. Движок реализуется в M1 (GDD §11).
+ * ЭТАП M1a: ядро. Генератор, цикл по тикам, пайплайн урона, матчапы,
+ * формат лога. Статусы (M1b) и трейты (M1c) объявлены интерфейсами
+ * с пустыми реестрами — по правилу GDD §4.5.
  *
  * Правила этого пакета, действующие с первого коммита:
  *
- *  1. Ноль зависимостей. Ни runtime, ни peer. Проверяется тестом.
+ *  1. Ноль РАНТАЙМ-зависимостей. Типы контракта приходят из
+ *     @extramundum/shared через `import type` — такой импорт стирается
+ *     при компиляции, в dist не остаётся ни одного `import` наружу.
+ *     Причина и подпорки — docs/adr/0003-tipy-kontrakta-v-shared.md.
+ *     Проверяется тестом по собранному dist, а не по манифесту.
  *  2. Ноль I/O. Ни сети, ни файловой системы, ни БД.
  *  3. Никакого `Math.random()` и `Date.now()`. Источник случайности —
  *     только сид, переданный аргументом. Один сид -> побитово
@@ -23,5 +29,26 @@
  */
 export const SIM_BUNDLE_MARKER = 'EXTRAMUNDUM_SIM_MUST_NEVER_REACH_THE_BROWSER';
 
-/** Версия формата боевого лога. Инкрементируется при несовместимых изменениях. */
-export const SIM_LOG_VERSION = 0;
+/**
+ * Версия формата боевого лога. Одно определение — в resolve.ts, рядом
+ * с кодом, который лог собирает. Два независимых счётчика версий
+ * разошлись бы на первом же изменении формата.
+ */
+export { LOG_VERSION as SIM_LOG_VERSION } from './resolve.js';
+
+export { rngFromSeed, rngFromState, seedToState, type Rng, type RngState } from './rng.js';
+export {
+  atkMultiplier,
+  createFighterState,
+  critChance,
+  dodgeChance,
+  ilvlScale,
+  matchupMultiplier,
+  maxHp,
+  mitigation,
+  type FighterState,
+} from './fighter.js';
+export { resolveAttack, type AttackOutcome } from './damage.js';
+export { resolveBattle, LOG_VERSION } from './resolve.js';
+export { tickStatuses, type Status, type StatusContext } from './statuses.js';
+export { TRAITS, type Trait, type TraitContext, type TraitHooks } from './traits.js';
