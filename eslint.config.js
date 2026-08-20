@@ -106,7 +106,6 @@ export default tseslint.config(
         window: 'readonly',
         document: 'readonly',
         fetch: 'readonly',
-        prompt: 'readonly',
         console: 'readonly',
       },
     },

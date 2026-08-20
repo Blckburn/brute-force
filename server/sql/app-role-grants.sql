@@ -191,10 +191,29 @@ $$;
 -- применения: важно не членство само по себе, а что оно уже никуда
 -- не ведёт.
 --
+-- Запрос повторяет формулу из server/src/db/privileges.ts, и повторяет
+-- её целиком не из аккуратности. Включённого RLS недостаточно: роль
+-- проходит сквозь него, если владеет таблицей или имеет BYPASSRLS.
+-- Проверка «RLS включён, значит закрыто» ответит «закрыто» там, где
+-- журнал стирается одной командой.
+--
+--   with journal as (
+--     select oid, relrowsecurity, relowner
+--     from pg_class
+--     where oid = 'drizzle.__drizzle_migrations'::regclass
+--   ),
+--   app as (
+--     select oid, rolbypassrls from pg_roles where rolname = 'extramundum_app'
+--   )
 --   select
---     has_schema_privilege('extramundum_app', 'public', 'CREATE')  as may_create,
---     has_table_privilege('extramundum_app', 'drizzle.__drizzle_migrations', 'INSERT')
---       and not (select relrowsecurity
---                from pg_class
---                where oid = 'drizzle.__drizzle_migrations'::regclass) as may_write_journal,
---     pg_has_role('extramundum_app', 'neon_superuser', 'MEMBER')   as is_neon_superuser;
+--     has_schema_privilege('extramundum_app', 'public', 'CREATE') as may_create,
+--     (select has_table_privilege('extramundum_app', journal.oid, 'INSERT')
+--             and (not journal.relrowsecurity
+--                  or journal.relowner = (select oid from app)
+--                  or coalesce((select rolbypassrls from app), false))
+--      from journal)                                             as may_write_journal,
+--     pg_has_role('extramundum_app', 'neon_superuser', 'MEMBER')  as is_neon_superuser,
+--     -- Если may_write_journal = true, эти два объясняют, почему:
+--     (select rolbypassrls from app)                              as обходит_rls,
+--     (select rolname from pg_roles
+--      where oid = (select relowner from journal))                as владелец_журнала;
