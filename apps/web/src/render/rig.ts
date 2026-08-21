@@ -5,9 +5,12 @@ import {
   BufferGeometry,
   Float32BufferAttribute,
   Group,
+  Matrix3,
   Mesh,
   Object3D,
   PointLight,
+  Vector3,
+  type Material,
 } from 'three';
 
 import type { MaterialCache } from './materials.js';
@@ -143,24 +146,10 @@ function fromTriangles(positions: number[]): BufferGeometry {
   return geometry;
 }
 
-/**
- * Подмена цветов при сборке: ключ палитры -> ключ палитры.
- *
- * Нужна затем, чтобы два бойца из ОДНОЙ спецификации отличались друг
- * от друга. Заводить вторую спецификацию ради другого цвета плаща
- * значило бы копировать двадцать пять узлов ради двух строк, а копия
- * через месяц расходится с оригиналом.
- *
- * Подменяется только КЛЮЧ, а не цвет: подставить сюда произвольный hex
- * нельзя, и палитра остаётся единственным источником цвета.
- */
-export type ColorOverrides = ReadonlyMap<string, string>;
-
 export function buildRig(
   spec: RigSpec,
   materials: MaterialCache,
   geometries: GeometryCache,
-  overrides?: ColorOverrides,
 ): BuiltRig {
   const nodes = new Map<string, Object3D>();
   const slots = new Map<RigSlot, Mesh[]>();
@@ -177,11 +166,10 @@ export function buildRig(
     // Невидимый меш всё равно стоил бы обхода и места в сцене.
     // Вид материала — из данных: узел городского происхождения получает
     // чистую заливку без света и тумана (ART-BIBLE §3 и §5).
-    const colorKey = overrides?.get(node.color) ?? node.color;
     const object: Object3D = isMesh
       ? new Mesh(
           geometries.get(w, h, d, node.shape),
-          materials.get(paletteColor(colorKey), node.origin === 'city' ? 'city' : 'world'),
+          materials.get(paletteColor(node.color), node.origin === 'city' ? 'city' : 'world'),
         )
       : new Object3D();
 
@@ -226,7 +214,111 @@ export function buildRig(
     }
   }
 
+  if (spec.static === true) mergeByMaterial(root, spec, nodes, slots, flickerables, cityNodes);
+
   return { root, nodes, slots, flickerables, cityNodes };
+}
+
+/**
+ * Слить меши неподвижного рига в один на материал.
+ *
+ * Зачем: силуэт города — двадцать два вызова отрисовки на объект,
+ * который за весь бой не сдвинется ни разу. Бюджет §3.4 конечен,
+ * и первое, что в него упрётся в M2b, — партиклы; отдавать запас
+ * неподвижной декорации расточительно.
+ *
+ * ПОЧЕМУ НЕ В ОДИН МЕШ, А ПО МАТЕРИАЛУ. Один меш потребовал бы либо
+ * массива материалов на нём, либо цвета в вершинах. Первое ломает
+ * верхнюю границу вызовов отрисовки в ОПАСНУЮ сторону: меш с массивом
+ * рисуется по группам, то есть один объект даёт несколько вызовов,
+ * и весь замер `budget.ts` перестаёт значить. Второе увело бы цвет
+ * из палитры в буфер вершин, и проверка «зарезервированный цвет только
+ * у города» осталась бы без того, что проверять. Разница в выигрыше
+ * при этом невелика: тонов у города пять.
+ *
+ * Иерархия после слияния не сохраняется — поэтому `static` запрещён
+ * ригам со слотами и со светом, и это проверяется здесь, а не
+ * в комментарии.
+ */
+function mergeByMaterial(
+  root: Group,
+  spec: RigSpec,
+  nodes: Map<string, Object3D>,
+  slots: Map<RigSlot, Mesh[]>,
+  flickerables: FlickerSource[],
+  cityNodes: Set<Object3D>,
+): void {
+  if (slots.size > 0) {
+    throw new Error(`риг «${spec.id}»: static запрещён — слияние стёрло бы слоты экипировки`);
+  }
+  if (flickerables.length > 0) {
+    throw new Error(`риг «${spec.id}»: static запрещён — слияние стёрло бы узлы со светом`);
+  }
+
+  root.updateMatrixWorld(true);
+
+  const byMaterial = new Map<Material, Mesh[]>();
+  const collect = (object: Object3D): void => {
+    if (object instanceof Mesh) {
+      const list = byMaterial.get(object.material as Material) ?? [];
+      list.push(object);
+      byMaterial.set(object.material as Material, list);
+    }
+    for (const child of object.children) collect(child);
+  };
+  collect(root);
+
+  root.clear();
+  nodes.clear();
+  const wasCity = new Set(cityNodes);
+  cityNodes.clear();
+
+  for (const [material, meshes] of byMaterial) {
+    const merged = new Mesh(mergeGeometries(meshes), material);
+    merged.name = `${spec.id}:merged`;
+    // Слитый меш принадлежит городу, если из города были все его части.
+    // Смешанного случая быть не может: материал у города свой.
+    if (meshes.every((mesh) => wasCity.has(mesh))) cityNodes.add(merged);
+    root.add(merged);
+    nodes.set(merged.name + ':' + String(nodes.size), merged);
+  }
+}
+
+/**
+ * Собрать одну геометрию из нескольких, применив мировые матрицы.
+ *
+ * Исходные геометрии приходят из кэша и разделяются с другими ригами,
+ * поэтому их нельзя трогать: вершины переносятся в новый буфер, а не
+ * преобразуются на месте.
+ */
+function mergeGeometries(meshes: readonly Mesh[]): BufferGeometry {
+  const positions: number[] = [];
+  const normals: number[] = [];
+  const point = new Vector3();
+  const normalMatrix = new Matrix3();
+
+  for (const mesh of meshes) {
+    // `toNonIndexed` выравнивает коробки (индексированные) и формы,
+    // собранные вручную (без индекса), к одному виду.
+    const geometry = mesh.geometry.index === null ? mesh.geometry : mesh.geometry.toNonIndexed();
+    const position = geometry.getAttribute('position');
+    const normal = geometry.getAttribute('normal');
+    normalMatrix.getNormalMatrix(mesh.matrixWorld);
+
+    for (let i = 0; i < position.count; i++) {
+      point.fromBufferAttribute(position, i).applyMatrix4(mesh.matrixWorld);
+      positions.push(point.x, point.y, point.z);
+      point.fromBufferAttribute(normal, i).applyMatrix3(normalMatrix).normalize();
+      normals.push(point.x, point.y, point.z);
+    }
+
+    if (geometry !== mesh.geometry) geometry.dispose();
+  }
+
+  const merged = new BufferGeometry();
+  merged.setAttribute('position', new Float32BufferAttribute(positions, 3));
+  merged.setAttribute('normal', new Float32BufferAttribute(normals, 3));
+  return merged;
 }
 
 /** Детерминированная фаза из имени: ноль обращений к random(). */

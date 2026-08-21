@@ -10,7 +10,7 @@ import {
 
 import { FrameLoop } from './frame.js';
 import { MaterialCache } from './materials.js';
-import { buildRig, GeometryCache, type BuiltRig, type ColorOverrides } from './rig.js';
+import { buildRig, GeometryCache, type BuiltRig } from './rig.js';
 
 /**
  * Сцена боя. ART-BIBLE §2–3, GDD §3.4.
@@ -24,8 +24,14 @@ import { buildRig, GeometryCache, type BuiltRig, type ColorOverrides } from './r
  * в явные списки `FrameLoop`, а не ищется обходом (§13, пункт 20).
  */
 
-/** Где стоят бойцы. Метры, ось X — вдоль арены. */
-const FIGHTER_X = 1.75;
+/**
+ * Где стоят бойцы. Метры, ось X — вдоль арены.
+ *
+ * Позиция ФИКСИРОВАНА: игрок слева, противник справа. Различать их
+ * цветом не нужно и не надо — они разойдутся снаряжением в M3, где
+ * у каждого восемь видимых слотов.
+ */
+const FIGHTER_X = 1.05;
 
 /**
  * Сдвиг бойцов к зрителю от центра площадки.
@@ -35,19 +41,6 @@ const FIGHTER_X = 1.75;
  * и ничем не занятая. Особенно заметно в портрете, где вертикали много.
  */
 const FIGHTER_Z = 1.15;
-
-/**
- * Чем второй боец отличается от первого.
- *
- * Подмена ключей палитры, а не вторая спецификация. Оба должны хорошо
- * читаться на тёмном фоне, поэтому различаются не «светлый и тёмный»,
- * а тоном: у первого выбеленная ткань и оловянная броня, у второго
- * охра и пепел.
- */
-const SECOND_FIGHTER: ColorOverrides = new Map([
-  ['parchment', 'ochre'],
-  ['tin', 'ash'],
-]);
 
 export type BattleScene = {
   readonly scene: Scene;
@@ -109,7 +102,7 @@ export function createBattleScene(aspect = 16 / 9): BattleScene {
   left.root.rotation.y = Math.PI / 2;
   scene.add(left.root);
 
-  const right = buildRig(RIGS.humanoid, materials, geometries, SECOND_FIGHTER);
+  const right = buildRig(RIGS.humanoid, materials, geometries);
   right.root.position.set(FIGHTER_X, 0, FIGHTER_Z);
   right.root.rotation.y = -Math.PI / 2;
   scene.add(right.root);
@@ -164,7 +157,7 @@ export function frameCamera(camera: PerspectiveCamera, aspect: number): void {
   // и СИЛЬНЕЕ наклон вниз: горизонт уходит вверх, и освободившуюся
   // вертикаль занимает пол арены, а не пустое небо и пустая земля.
   camera.fov = narrow ? 54 : 42;
-  camera.position.set(0, narrow ? 2.9 : 2.9, narrow ? 9.4 : 8.4);
-  camera.lookAt(0, narrow ? 0.55 : 1.2, narrow ? -2.8 : 0);
+  camera.position.set(0, narrow ? 2.45 : 2.7, narrow ? 7.0 : 6.6);
+  camera.lookAt(0, narrow ? 0.8 : 1.05, narrow ? -1.9 : 0);
   camera.updateProjectionMatrix();
 }

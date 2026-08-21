@@ -1,7 +1,7 @@
 import { RIGS } from '@extramundum/data';
 import { RIG_SHAPES, RIG_SLOTS, rigSpecSchema, type RigSpec } from '@extramundum/shared';
 import { describe, expect, it } from 'vitest';
-import { Mesh, PointLight } from 'three';
+import { Box3, Mesh, PointLight, Vector3 } from 'three';
 
 import { MaterialCache } from '../materials.js';
 import { buildRig, GeometryCache } from '../rig.js';
@@ -209,36 +209,120 @@ describe('формы из спецификации', () => {
   });
 });
 
-describe('подмена цветов при сборке', () => {
-  it('два бойца из одной спецификации отличаются цветом', () => {
-    const materials = new MaterialCache();
-    const geometries = new GeometryCache();
+describe('слияние неподвижного рига', () => {
+  const built = () => build(RIGS.munda);
 
-    const plain = buildRig(RIGS.humanoid, materials, geometries);
-    const swapped = buildRig(
-      RIGS.humanoid,
-      materials,
-      geometries,
-      new Map([['parchment', 'ochre']]),
-    );
+  it('город помечен static и слит по материалу, а не по узлу', () => {
+    expect(RIGS.munda.static, 'город перестал быть неподвижным').toBe(true);
 
-    const hex = (rig: typeof plain, node: string) =>
-      (
-        (rig.nodes.get(node) as Mesh).material as { color: { getHexString(): string } }
-      ).color.getHexString();
+    const { rig } = built();
+    const meshes: Mesh[] = [];
+    rig.root.traverse((object) => {
+      if (object instanceof Mesh) meshes.push(object);
+    });
 
-    expect(hex(swapped, 'torso')).not.toBe(hex(plain, 'torso'));
-    // Не задетые подменой узлы остались прежними — иначе это не подмена,
-    // а перекраска всего рига.
-    expect(hex(swapped, 'head')).toBe(hex(plain, 'head'));
+    const distinctMaterials = new Set(meshes.map((mesh) => mesh.material));
+    // Мешей ровно столько, сколько материалов: по одному на тон.
+    expect(meshes.length).toBe(distinctMaterials.size);
+    // И это СИЛЬНО меньше числа узлов — иначе слияние ничего не дало.
+    const sourceNodes = RIGS.munda.nodes.filter((node) => node.size.some((v) => v > 0)).length;
+    expect(sourceNodes).toBeGreaterThan(meshes.length * 3);
   });
 
-  it('подменяется КЛЮЧ палитры, а не произвольный цвет', () => {
+  it('ни один меш не получил МАССИВ материалов', () => {
+    // Массив материалов слил бы город в один объект — и сломал бы верхнюю
+    // границу вызовов отрисовки в опасную сторону: такой меш рисуется
+    // по группам, то есть один объект даёт несколько вызовов.
+    const { rig } = built();
+    rig.root.traverse((object) => {
+      if (object instanceof Mesh) expect(Array.isArray(object.material)).toBe(false);
+    });
+  });
+
+  it('слияние ничего не теряет: треугольников столько же', () => {
     const materials = new MaterialCache();
     const geometries = new GeometryCache();
-    expect(() =>
-      buildRig(RIGS.humanoid, materials, geometries, new Map([['parchment', '#ff00ff']])),
-    ).toThrow(/нет цвета/);
+
+    // Тот же набор узлов без слияния — эталон.
+    const loose = buildRig(
+      rigSpecSchema.parse({ ...RIGS.munda, static: false }),
+      materials,
+      geometries,
+    );
+    const merged = buildRig(RIGS.munda, new MaterialCache(), new GeometryCache());
+
+    const triangles = (root: { traverse(cb: (o: unknown) => void): void }) => {
+      let total = 0;
+      root.traverse((object) => {
+        if (!(object instanceof Mesh)) return;
+        const geometry = object.geometry;
+        total += (geometry.index?.count ?? geometry.getAttribute('position').count) / 3;
+      });
+      return total;
+    };
+
+    expect(triangles(merged.root)).toBe(triangles(loose.root));
+    expect(triangles(merged.root)).toBeGreaterThan(50);
+  });
+
+  it('слияние применяет мировые матрицы: габарит сохраняется', () => {
+    // Забыть матрицу — значит свалить все узлы в начало координат.
+    // Тогда треугольников столько же, а город превращается в кучу.
+    const { rig } = built();
+    const box = new Box3().setFromObject(rig.root);
+    const size = new Vector3();
+    box.getSize(size);
+
+    // Город шире тридцати метров и выше десяти — числа из спецификации.
+    expect(size.x).toBeGreaterThan(30);
+    expect(size.y).toBeGreaterThan(10);
+  });
+
+  it('исходные геометрии из кэша НЕ испорчены слиянием', () => {
+    // Кэш общий: если перенос вершин выполнить на месте, следующий риг
+    // получит коробку, уже сдвинутую в мировые координаты города.
+    //
+    // Проверяются ОБА вида геометрии, и это не перестраховка. Коробка
+    // индексированная, и слияние копирует её через `toNonIndexed` — то
+    // есть защищена случайно. Пирамида и крыша собраны без индекса
+    // и берутся из кэша НАПРЯМУЮ: уязвим именно этот путь. Первая версия
+    // теста смотрела только на коробку, и диверсия «перенести вершины
+    // на месте» прошла зелёной.
+    const materials = new MaterialCache();
+    const geometries = new GeometryCache();
+
+    const snapshot = (g: { getAttribute(name: string): { array: ArrayLike<number> } }) =>
+      Array.from(g.getAttribute('position').array);
+
+    // Габариты взяты из спецификации города — иначе кэш вернёт геометрию,
+    // которой слияние не касалось, и проверять будет нечего.
+    const cathTower = RIGS.munda.nodes.find((n) => n.name === 'cathTower')!;
+    const spire = RIGS.munda.nodes.find((n) => n.name === 'spire')!;
+
+    const box = geometries.get(...(cathTower.size as [number, number, number]), 'box');
+    const pyramid = geometries.get(...(spire.size as [number, number, number]), 'pyramid');
+    const beforeBox = snapshot(box);
+    const beforePyramid = snapshot(pyramid);
+
+    const rig = buildRig(RIGS.munda, materials, geometries);
+
+    expect(snapshot(box), 'коробка из кэша сдвинута слиянием').toEqual(beforeBox);
+    expect(snapshot(pyramid), 'пирамида из кэша сдвинута слиянием').toEqual(beforePyramid);
+
+    // И слияние ДЕЙСТВИТЕЛЬНО прошло по этим геометриям: иначе проверка
+    // выше доказывала бы лишь то, что их никто не трогал.
+    expect(rig.root.children.length).toBeGreaterThan(0);
+    expect(geometries.size).toBeGreaterThan(2);
+  });
+
+  it('static запрещён ригу со слотами: слияние стёрло бы экипировку', () => {
+    const withSlots = rigSpecSchema.parse({ ...RIGS.humanoid, static: true });
+    expect(() => build(withSlots)).toThrow(/слоты экипировки/);
+  });
+
+  it('static запрещён ригу со светом: слияние стёрло бы жаровни', () => {
+    const withLights = rigSpecSchema.parse({ ...RIGS.arena, static: true });
+    expect(() => build(withLights)).toThrow(/узлы со светом/);
   });
 });
 
