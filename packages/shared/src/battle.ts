@@ -40,14 +40,10 @@ export const simulatePreviewInputSchema = z.object({
 export type SimulatePreviewInput = z.infer<typeof simulatePreviewInputSchema>;
 
 /**
- * Формат боевого лога определяется в M1 вместе с движком (GDD §3.2).
- * В M0 эндпоинты отвечают 501, поэтому тип объявлен, но не раскрыт:
- * раскрывать его сейчас значило бы проектировать движок раньше срока.
+ * Формат боевого лога раскрыт в ./combat.ts вместе с движком (M1a).
+ * Здесь остаются только оболочки ответов HTTP.
  */
-export type BattleLog = {
-  readonly version: number;
-  readonly events: readonly unknown[];
-};
+import type { BattleLog } from './combat.js';
 
 export type BattleStartResponse = {
   readonly battleId: string;
@@ -58,4 +54,15 @@ export type SimulatePreviewResponse = {
   /** Оценка шанса победы, 0..1. */
   readonly winRate: number;
   readonly runs: number;
+  /**
+   * На чём построена оценка.
+   *
+   * `sparring-dummy` — соперник собран масштабированием от уровня игрока
+   * со сдвигом по сложности, зона на его силу не влияет: настоящие
+   * противники зон появятся в M3. Клиент обязан подписать такое число
+   * честно, а не выдавать за оценку по зоне.
+   *
+   * `zone-enemy` появится вместе с генерацией врагов.
+   */
+  readonly basis: 'sparring-dummy' | 'zone-enemy';
 };

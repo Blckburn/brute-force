@@ -9,6 +9,7 @@
  */
 export * from './auth.js';
 export * from './battle.js';
+export * from './combat.js';
 export * from './errors.js';
 export * from './player.js';
 export * from './routes.js';

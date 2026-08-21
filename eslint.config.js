@@ -46,7 +46,10 @@ export default tseslint.config(
           message: 'packages/sim не обращается ко времени (инвариант 2).',
         },
       ],
-      'no-restricted-imports': [
+      // Версия из typescript-eslint: она умеет отличать `import type`
+      // от обычного импорта, а базовое правило — нет.
+      'no-restricted-imports': 'off',
+      '@typescript-eslint/no-restricted-imports': [
         'error',
         {
           patterns: [
@@ -55,8 +58,21 @@ export default tseslint.config(
               message: 'packages/sim не делает I/O (инвариант 2).',
             },
             {
-              group: ['@extramundum/*'],
-              message: 'packages/sim не зависит ни от чего (инвариант 2).',
+              // Типы контракта — единственное, что движок берёт снаружи,
+              // и только через `import type`: такой импорт стирается при
+              // компиляции, рантайм-ребра не возникает. Обычный импорт
+              // отсюда по-прежнему запрещён.
+              // Причина: docs/adr/0003-tipy-kontrakta-v-shared.md
+              group: ['@extramundum/shared'],
+              allowTypeImports: true,
+              message:
+                'Из @extramundum/shared в sim можно брать ТОЛЬКО типы: import type. ADR 0003.',
+            },
+            {
+              // Всё остальное — рантайм-зависимость в любом виде.
+              // Коэффициенты приходят аргументом, а не импортом (инвариант 5).
+              group: ['@extramundum/data', '@extramundum/sim', '@extramundum/web'],
+              message: 'packages/sim не зависит ни от чего, кроме типов контракта (инвариант 2).',
             },
           ],
         },

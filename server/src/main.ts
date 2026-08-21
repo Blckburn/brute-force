@@ -16,7 +16,12 @@ const server = serve({ fetch: createApp(db, config, log).fetch, port: config.POR
 
 // Не блокирует старт: сервер с избыточными правами работает правильно,
 // просто хуже защищён. Об этом нужно знать, а не падать из-за этого.
-void reportRuntimePrivileges(db, log, config.NODE_ENV === 'production');
+void reportRuntimePrivileges(
+  db,
+  log,
+  config.NODE_ENV === 'production',
+  config.DB_PRIVILEGE_EXCEPTIONS,
+);
 
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.on(signal, () => {

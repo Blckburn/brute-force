@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm';
 
+import type { PrivilegeException } from '../config.ts';
 import type { Database } from './client.ts';
 import type { Logger } from '../logger.ts';
 
@@ -79,10 +80,37 @@ export async function checkRuntimePrivileges(db: Database): Promise<RuntimePrivi
   };
 }
 
+/**
+ * Находка — одно избыточное право с именем, под которым оно может быть
+ * объявлено принятым в DB_PRIVILEGE_EXCEPTIONS.
+ */
+type Finding = { readonly key: string; readonly exception: PrivilegeException | null };
+
+function findings(p: RuntimePrivileges): Finding[] {
+  const all: Finding[] = [
+    // Жёсткий сигнал: принять такое нельзя ни при каких условиях.
+    // Роль рантайма с DDL или суперпользователем — это авария, а не
+    // ограничение хостинга.
+    { key: 'mayCreateInPublic', exception: null },
+    { key: 'isSuperuser', exception: null },
+    // Может быть принято: см. ADR 0002.
+    { key: 'mayWriteMigrationJournal', exception: 'migration-journal' },
+  ];
+
+  const value: Record<string, boolean> = {
+    mayCreateInPublic: p.mayCreateInPublic,
+    isSuperuser: p.isSuperuser,
+    mayWriteMigrationJournal: p.mayWriteMigrationJournal,
+  };
+
+  return all.filter((f) => value[f.key] === true);
+}
+
 export async function reportRuntimePrivileges(
   db: Database,
   log: Logger,
   isProduction: boolean,
+  accepted: readonly PrivilegeException[] = [],
 ): Promise<void> {
   let privileges: RuntimePrivileges;
   try {
@@ -94,18 +122,29 @@ export async function reportRuntimePrivileges(
     return;
   }
 
-  const excessive =
-    privileges.mayCreateInPublic || privileges.mayWriteMigrationJournal || privileges.isSuperuser;
+  const found = findings(privileges);
+  const isAccepted = (f: Finding): boolean =>
+    f.exception !== null && accepted.includes(f.exception);
 
-  if (!excessive) {
-    log.info('права роли в порядке: только работа со строками', { role: privileges.role });
-    return;
-  }
+  const unexpected = found.filter((f) => !isAccepted(f));
+  const known = found.filter(isAccepted);
+
+  // Одна строка при каждом старте: сколько исключений действует.
+  // Принятое решение обязано оставаться видимым, иначе через полгода
+  // никто не вспомнит, что мы вообще что-то принимали.
+  log.info('права роли проверены', {
+    role: privileges.role,
+    acceptedExceptions: known.length,
+    ...(known.length > 0 ? { accepted: known.map((f) => f.exception), see: 'ADR 0002' } : {}),
+  });
+
+  if (unexpected.length === 0) return;
 
   // В проде это заметный недосмотр, локально — обычное дело.
   const level = isProduction ? 'warn' : 'debug';
   log[level]('сервер работает ролью с избыточными правами', {
     role: privileges.role,
+    excessive: unexpected.map((f) => f.key),
     mayCreateInPublic: privileges.mayCreateInPublic,
     mayWriteMigrationJournal: privileges.mayWriteMigrationJournal,
     isSuperuser: privileges.isSuperuser,

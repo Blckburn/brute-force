@@ -39,7 +39,7 @@ export function createApp(db: Database, config: Config, log: Logger): Hono<AppEn
 
   app.route('/', healthRoutes(db));
   app.route('/', meRoutes(db));
-  app.route('/', battleRoutes());
+  app.route('/', battleRoutes(db));
   app.route('/auth', authRoutes(db));
 
   // Вход, выход и чтение сессии обслуживает сам Better Auth.

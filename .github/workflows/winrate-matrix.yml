@@ -1,0 +1,66 @@
+# Полная матрица винрейтов. GDD §4.6, пункт 2: «10 000 симуляций
+# на каждую пару архетипов».
+#
+# Отдельным workflow, а не шагом в CI, по одной причине: 10 000 × 6 пар
+# плюс связки и одиночные трейты идут минуты. На каждом пуше это цена
+# без выигрыша — сокращённая выборка в CI ловит те же поломки почти
+# так же быстро. Ночной прогон нужен там, где сокращённая выборка
+# врёт: у пары с винрейтом около границы коридора доверительный
+# интервал на 800 боях шире, чем сама граница.
+name: Матрица винрейтов
+
+on:
+  schedule:
+    # Ежедневно в 03:00 UTC.
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+    inputs:
+      runs:
+        description: Боёв на пару
+        default: '10000'
+  push:
+    paths:
+      # Правка чисел баланса или самого движка — единственный повод
+      # гонять полную матрицу вне расписания.
+      - 'packages/data/balance.json'
+      - 'packages/sim/**'
+      - 'scripts/winrate-matrix.mjs'
+
+concurrency:
+  group: winrate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  matrix:
+    name: 10 000 боёв на пару архетипов
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+
+      # Числа печатаются в лог целиком, включая связки внутри школ
+      # и одиночные трейты: «упало/не упало» о балансе не говорит
+      # ничего, а таблица говорит, куда смотреть.
+      - name: Матрица
+        run: pnpm balance:matrix -- --runs ${{ inputs.runs || '10000' }}
+
+      # Тот же прогон в машиночитаемом виде — чтобы можно было сравнить
+      # две ночи между собой, а не пересказывать лог по памяти.
+      - name: Отчёт для сравнения между прогонами
+        if: always()
+        run: pnpm balance:matrix -- --runs ${{ inputs.runs || '10000' }} --json > winrate-matrix.json
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: winrate-matrix
+          path: winrate-matrix.json

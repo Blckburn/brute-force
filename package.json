@@ -25,7 +25,8 @@
     "dev": "pnpm --parallel --filter @extramundum/server --filter @extramundum/web dev",
     "assets:build": "node scripts/process-assets.mjs",
     "assets:check": "node scripts/process-assets.mjs --check",
-    "check:docs": "node scripts/check-doc-refs.mjs"
+    "check:docs": "node scripts/check-doc-refs.mjs",
+    "balance:matrix": "node scripts/winrate-matrix.mjs"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

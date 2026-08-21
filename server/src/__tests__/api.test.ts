@@ -325,42 +325,151 @@ describe.skipIf(!HAS_DB)('API', () => {
     });
   });
 
-  describe('заглушки боя', () => {
-    const cases = [
-      {
-        path: API_ROUTES.battleStart,
-        body: { zone: 'wastes', difficulty: 'normal', loadoutHash: LOADOUT },
-      },
-      {
-        path: API_ROUTES.simulatePreview,
-        body: { zone: 'abyss', difficulty: 'nightmare', loadoutHash: LOADOUT },
-      },
-    ] as const;
+  describe('battle/start — заглушка до M3', () => {
+    const body = { zone: 'wastes', difficulty: 'normal', loadoutHash: LOADOUT } as const;
 
-    for (const { path, body } of cases) {
-      it(`${path} без сессии — 401`, async () => {
-        const res = await post(ctx, path, body);
-        expect(res.status).toBe(401);
+    it('без сессии — 401', async () => {
+      expect((await post(ctx, API_ROUTES.battleStart, body)).status).toBe(401);
+    });
+
+    it('с сессией — 501: нужен противник, лут и награды, это M3', async () => {
+      const { jar } = await register(ctx);
+      const res = await post(ctx, API_ROUTES.battleStart, body, jar);
+
+      expect(res.status).toBe(501);
+      expect(res.body).toMatchObject({
+        error: { code: 'not_implemented', messageKey: 'error.not_implemented' },
       });
+    });
 
-      it(`${path} с сессией — 501, реализация в M1`, async () => {
-        const { jar } = await register(ctx);
-        const res = await post(ctx, path, body, jar);
+    it('валидирует тело до того, как ответить 501', async () => {
+      const { jar } = await register(ctx);
+      const res = await post(
+        ctx,
+        API_ROUTES.battleStart,
+        { zone: 'нет такой зоны', difficulty: 'normal' },
+        jar,
+      );
 
-        expect(res.status).toBe(501);
-        expect(res.body).toMatchObject({
-          error: { code: 'not_implemented', messageKey: 'error.not_implemented' },
-        });
-      });
+      expect(res.status).toBe(400);
+      expect(res.body).toMatchObject({ error: { code: 'validation_failed' } });
+    });
+  });
 
-      it(`${path} валидирует тело до того, как ответить 501`, async () => {
-        const { jar } = await register(ctx);
-        const res = await post(ctx, path, { zone: 'нет такой зоны', difficulty: 'normal' }, jar);
+  /**
+   * Вертикальный срез M1a: от HTTP до формул движка.
+   *
+   * Отдельная ценность этих тестов — они проходят через настоящую
+   * сессию и настоящую БД. Движок покрыт своими тестами; здесь
+   * проверяется, что между запросом и движком ничего не потерялось
+   * и что клиент не может подсунуть свои статы.
+   */
+  describe('simulate/preview', () => {
+    const body = { zone: 'wastes', difficulty: 'normal', loadoutHash: LOADOUT } as const;
 
-        expect(res.status).toBe(400);
-        expect(res.body).toMatchObject({ error: { code: 'validation_failed' } });
-      });
-    }
+    it('без сессии — 401', async () => {
+      expect((await post(ctx, API_ROUTES.simulatePreview, body)).status).toBe(401);
+    });
+
+    it('возвращает осмысленную оценку', async () => {
+      const { jar } = await register(ctx);
+      const res = await post(ctx, API_ROUTES.simulatePreview, { ...body, runs: 100 }, jar);
+
+      expect(res.status).toBe(200);
+      const payload = res.body as { winRate: number; runs: number; basis: string };
+
+      expect(payload.runs).toBe(100);
+      expect(payload.winRate).toBeGreaterThanOrEqual(0);
+      expect(payload.winRate).toBeLessThanOrEqual(1);
+      // Соперник помечен честно: зонных врагов ещё нет (M3).
+      expect(payload.basis).toBe('sparring-dummy');
+    });
+
+    it('одинаковый запрос даёт одинаковый ответ', async () => {
+      const { jar } = await register(ctx);
+      const first = await post(ctx, API_ROUTES.simulatePreview, { ...body, runs: 60 }, jar);
+      const second = await post(ctx, API_ROUTES.simulatePreview, { ...body, runs: 60 }, jar);
+
+      // Иначе игрок, дважды посмотревший на один предмет, увидит два
+      // разных числа и перестанет верить обоим (GDD §6.4).
+      expect((second.body as { winRate: number }).winRate).toBe(
+        (first.body as { winRate: number }).winRate,
+      );
+    });
+
+    it('сложность влияет на оценку', async () => {
+      const { jar } = await register(ctx);
+      const normal = await post(
+        ctx,
+        API_ROUTES.simulatePreview,
+        { ...body, difficulty: 'normal', runs: 120 },
+        jar,
+      );
+      const nightmare = await post(
+        ctx,
+        API_ROUTES.simulatePreview,
+        { ...body, difficulty: 'nightmare', runs: 120 },
+        jar,
+      );
+
+      const easy = (normal.body as { winRate: number }).winRate;
+      const hard = (nightmare.body as { winRate: number }).winRate;
+
+      // Кошмар даёт противнику +5 уровней (balance.raid.difficulty).
+      // Если сложность не влияет — числа совпадут, и превью бесполезно.
+      expect(hard).toBeLessThanOrEqual(easy);
+      expect(easy - hard).toBeGreaterThan(0);
+    });
+
+    it('инвариант 1: статы бойца в теле запроса игнорируются', async () => {
+      const { jar } = await register(ctx);
+
+      const honest = await post(ctx, API_ROUTES.simulatePreview, { ...body, runs: 80 }, jar);
+      const cheated = await post(
+        ctx,
+        API_ROUTES.simulatePreview,
+        {
+          ...body,
+          runs: 80,
+          // Схема таких полей не содержит — они обязаны быть отброшены,
+          // а не подмешаны в бойца.
+          atk: 9999,
+          level: 40,
+          statAtk: 9999,
+          player: { atk: 9999, armor: 9999 },
+        },
+        jar,
+      );
+
+      expect(cheated.status).toBe(200);
+      expect((cheated.body as { winRate: number }).winRate).toBe(
+        (honest.body as { winRate: number }).winRate,
+      );
+    });
+
+    it('укладывается в бюджет ответа GDD §6.4: 300 прогонов быстрее 500 мс', async () => {
+      const { jar } = await register(ctx);
+
+      const started = performance.now();
+      const res = await post(ctx, API_ROUTES.simulatePreview, { ...body, runs: 300 }, jar);
+      const elapsed = performance.now() - started;
+
+      expect(res.status).toBe(200);
+      expect(elapsed).toBeLessThan(500);
+    });
+
+    it('валидирует тело', async () => {
+      const { jar } = await register(ctx);
+      const res = await post(
+        ctx,
+        API_ROUTES.simulatePreview,
+        { zone: 'нет такой зоны', difficulty: 'normal' },
+        jar,
+      );
+
+      expect(res.status).toBe(400);
+      expect(res.body).toMatchObject({ error: { code: 'validation_failed' } });
+    });
   });
 
   describe('прочее', () => {

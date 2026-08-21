@@ -7,6 +7,17 @@ import { z } from 'zod';
  *
  * Инвариант 7: значения приходят из окружения, в репозитории их нет.
  */
+/**
+ * Допустимые имена принятых исключений.
+ *
+ * `migration-journal` — журнал миграций доступен роли рантайма на запись.
+ * На Neon роль из консоли приходит с атрибутом BYPASSRLS, поэтому
+ * построчная защита журнала не действует, а снять атрибут нельзя:
+ * управление ролями вынесено в панель. Причина и замеры — ADR 0002.
+ */
+export const PRIVILEGE_EXCEPTIONS = ['migration-journal'] as const;
+export type PrivilegeException = (typeof PRIVILEGE_EXCEPTIONS)[number];
+
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().min(1).max(65535).default(8787),
@@ -15,7 +26,52 @@ const envSchema = z.object({
   DATABASE_URL: z.string().min(1, 'DATABASE_URL обязателен'),
 
   BETTER_AUTH_SECRET: z.string().min(32, 'BETTER_AUTH_SECRET должен быть не короче 32 символов'),
-  BETTER_AUTH_URL: z.url(),
+  /**
+   * Адрес, по которому Better Auth сопоставляет входящие запросы:
+   * baseURL + basePath должны равняться пути, который ВИДИТ СЕРВЕР.
+   *
+   * Только origin, без пути. Причина не в аккуратности: статика снимает
+   * префикс `/api` при проксировании, и до сервера доходит `/auth/...`.
+   * Если сюда записать адрес клиента вместе с `/api`, Better Auth станет
+   * ждать `/api/auth/...`, не найдёт совпадения и ответит 404 на вход —
+   * молча, потому что 404 не ошибка. Ровно это и случилось на проде.
+   */
+  BETTER_AUTH_URL: z.url().refine(
+    (v) => {
+      const { pathname } = new URL(v);
+      return pathname === '/' || pathname === '';
+    },
+    {
+      message:
+        'BETTER_AUTH_URL должен быть только origin, без пути: сервер получает запросы на /auth, а не на /api/auth',
+    },
+  ),
+
+  /**
+   * Известные и осознанно принятые ограничения прав роли БД. Через запятую.
+   *
+   * Зачем это вообще есть. Проверка прав при старте (`src/db/privileges.ts`)
+   * стоит ровно на одном: ей верят. Верное предупреждение, которое висит
+   * в логах каждый старт и починить которое нельзя, через неделю читается
+   * как фон — и тогда оно промолчит в тот день, когда скажет о новом.
+   *
+   * Поэтому известный риск объявляется здесь явным решением человека
+   * и перестаёт логироваться. Неизвестный по-прежнему кричит.
+   *
+   * Набор имён закрыт: опечатка валит старт, а не возвращает тот самый
+   * шум, ради устранения которого механизм и заведён.
+   */
+  DB_PRIVILEGE_EXCEPTIONS: z
+    .string()
+    .default('')
+    .transform((v) =>
+      v
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean),
+    )
+    .pipe(z.array(z.enum(PRIVILEGE_EXCEPTIONS)))
+    .transform((v) => [...new Set(v)]),
 
   /** Через запятую. Origin-ы клиента, которым разрешены запросы с куками. */
   CORS_ORIGINS: z

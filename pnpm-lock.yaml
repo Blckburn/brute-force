@@ -67,7 +67,11 @@ importers:
         specifier: ^4.1.13
         version: 4.4.3
 
-  packages/sim: {}
+  packages/sim:
+    devDependencies:
+      '@extramundum/shared':
+        specifier: workspace:*
+        version: link:../shared
 
   server:
     dependencies:

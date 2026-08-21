@@ -1,8 +1,7 @@
 {
   "$comment": "Инвариант 5: все коэффициенты баланса живут здесь. Коэффициент, захардкоженный в логике, — это баг. Каждый блок помечен разделом GDD, откуда взят; менять числа здесь, а не в коде.",
-  "version": 1,
-  "gddVersion": "2.0.1",
-
+  "version": 2,
+  "gddVersion": "2.6",
   "damage": {
     "$source": "GDD §4.2, пайплайн удара",
     "atkDivisor": 60,
@@ -13,7 +12,6 @@
       "cap": 0.75
     }
   },
-
   "dodge": {
     "$source": "GDD §4.2, clamp(0.03 + (AGI_защ − ACC_атак) × 0.008, 0, 0.30)",
     "base": 0.03,
@@ -21,14 +19,12 @@
     "min": 0.0,
     "max": 0.3
   },
-
   "crit": {
     "$source": "GDD §4.2, 0.05 + AGI × 0.004, кап 60%",
     "base": 0.05,
     "perAgi": 0.004,
     "cap": 0.6
   },
-
   "block": {
     "$source": "GDD §4.2, щит.blockChance 15–35%, снижение урона 60–100%",
     "chanceMin": 0.15,
@@ -36,36 +32,304 @@
     "reductionMin": 0.6,
     "reductionMax": 1.0
   },
-
   "maxHp": {
     "$source": "GDD §4.2, 60 + DEF × 6 + уровень × 14 + бонусы_путей",
     "base": 60,
     "perDef": 6,
     "perLevel": 14
   },
-
+  "tick": {
+    "$source": "GDD §4.1, цикл по тикам: initiative += spd, перешедший порог действует",
+    "$note": "Порог 100 задан псевдокодом GDD, LIMIT там назван, но числом не определён. 2000 выведено из расчёта, а не выбрано на глаз: при SPD 5 боец переходит порог раз в 20 тиков, то есть за 2000 тиков успевает ~100 действий. Бойцу первого уровня с голыми кулаками нужно около 30 попаданий, чтобы свалить спарринг-манекена, — с меньшим лимитом бой обрывался бы ничьёй ДО исхода, и превью показывало бы 0% там, где шанс есть. Лимит существует, чтобы ловить настоящий пат (нулевой урон с обеих сторон), а не чтобы ограничивать длину нормального боя.",
+    "initiativeThreshold": 100,
+    "limit": 2000,
+    "minSpd": 2
+  },
+  "traits": {
+    "$source": "GDD §4.5. Шесть аудитных трейтов имеют числа в самом документе; остальные спроектированы при реализации M1c",
+    "calibration": "matrix-2026-08-20",
+    "$calibration": "Выверено матрицей винрейтов §4.6. Числа ЧЕТЫРЁХ аудитных трейтов (warlord, fortress, phantom, hexblade) и четырёх врождённых взяты из GDD дословно и калибровке НЕ ПОДЛЕЖАТ: правка документа — решение человека. Числа cursed и thorns БЫЛИ такими же, но по итогам матрицы исправлены в самом GDD (версия 2.5) решением человека: прежние давали cursed 14% побед против голого носителя, а thorns 87%. У cursed множитель 1.4 применяется к УРОНУ, а не к стату ATK — «ATK ×1.4» в системе, где урон равен оружие × (1 + ATK/60), давало +5.7% вместо +40%. У thorns добавлен потолок отражения за удар: на первом уровне он не срабатывает и не должен, он ограничивает рост вместе с прогрессией. slippery усилен там же: множителя чужого крита одного хватало только на 61.5% при соседях в 57–74%.",
+    "warlord": {
+      "atkPerKill": 3
+    },
+    "cursed": {
+      "damageMultiplier": 1.4,
+      "hpFractionPerTurn": 0.02
+    },
+    "executioner": {
+      "hpThreshold": 0.3,
+      "damageMultiplier": 1.35
+    },
+    "bloodlust": {
+      "bleedStacks": 1,
+      "chance": 0.15
+    },
+    "berserker": {
+      "maxBonus": 0.35
+    },
+    "overpower": {
+      "stunOnCrit": 1
+    },
+    "ironGrip": {
+      "armorPenetration": 0.1
+    },
+    "butcher": {
+      "damageBonusVsBleeding": 0.05
+    },
+    "fortress": {
+      "blockReduction": 1.0
+    },
+    "thorns": {
+      "reflectFraction": 0.06,
+      "maxReflectPerHit": 6
+    },
+    "secondWind": {
+      "hpThreshold": 0.25,
+      "regenStacks": 1
+    },
+    "bulwark": {
+      "shieldStacks": 2
+    },
+    "stoneskin": {
+      "hpThreshold": 0.5,
+      "armorMultiplier": 1.2
+    },
+    "retribution": {
+      "burnStacks": 1
+    },
+    "hardened": {
+      "armor": 4
+    },
+    "resolve": {
+      "stunDurationMultiplier": 0.5
+    },
+    "phantom": {
+      "avoidChance": 0.1
+    },
+    "windup": {
+      "everyNTurns": 4,
+      "damageMultiplier": 1.5
+    },
+    "riposte": {
+      "bleedStacks": 3
+    },
+    "quickstep": {
+      "spdMultiplier": 1.05
+    },
+    "deadeye": {
+      "accuracy": 8
+    },
+    "bleedout": {
+      "bleedStacks": 2
+    },
+    "slippery": {
+      "enemyCritMultiplier": 0.2,
+      "incomingReduction": 0.04
+    },
+    "hexblade": {
+      "chance": 0.2,
+      "hexStacks": 1
+    },
+    "plaguebearer": {
+      "poisonStacks": 1,
+      "chance": 0.15
+    },
+    "amplifier": {
+      "dotDamageBonus": 0.3
+    },
+    "pyromancer": {
+      "burnStacks": 1
+    },
+    "leech": {
+      "healFraction": 0.05
+    },
+    "frostbite": {
+      "chillStacks": 1,
+      "chance": 0.35
+    },
+    "siphon": {
+      "chance": 0.15
+    },
+    "innateThief": {
+      "damagePerConsecutiveHit": 0.05,
+      "maxStacks": 6
+    },
+    "innateGuard": {
+      "firstHitReduction": 0.5
+    },
+    "innateAdvocate": {
+      "guaranteedCritAfterDodge": 1
+    },
+    "innateScholar": {
+      "extraDuration": 1
+    }
+  },
+  "archetypes": {
+    "$source": "GDD §5.1. Документ описывает наклон словами, чисел не даёт",
+    "calibration": "matrix-2026-08-20",
+    "$calibration": "Выверено матрицей винрейтов §4.6 (scripts/winrate-matrix.mjs, 4000 боёв на пару): все шесть пар в 44–56% при коридоре 35–65%. Матрица держится именно на этих числах: если коридор перестанет сходиться, смотреть надо сюда раньше, чем на трейты и статусы.",
+    "theft": {
+      "atk": 10,
+      "def": 11,
+      "agi": 11,
+      "spd": 12,
+      "accuracy": 3,
+      "armor": 33,
+      "trait": "innateThief"
+    },
+    "brawl": {
+      "atk": 12,
+      "def": 16,
+      "agi": 10,
+      "spd": 9,
+      "accuracy": 3,
+      "armor": 53,
+      "trait": "innateGuard"
+    },
+    "advocacy": {
+      "atk": 9,
+      "def": 8,
+      "agi": 16,
+      "spd": 15,
+      "accuracy": 7,
+      "armor": 25,
+      "trait": "innateAdvocate"
+    },
+    "forbidden": {
+      "atk": 12,
+      "def": 13,
+      "agi": 13,
+      "spd": 13,
+      "accuracy": 2,
+      "armor": 29,
+      "trait": "innateScholar"
+    }
+  },
+  "statuses": {
+    "$source": "GDD §4.4 задаёт систему и набор эффектов; §7.5 — числа enrage",
+    "$note": "GDD НЕ ДАЁТ чисел для статусов, кроме enrage. Всё остальное здесь назначено при реализации M1b, чтобы эффекты можно было проверить тестами. Длительности заданы в тиках, как требует §4.4; при SPD около 10 боец ходит раз в 10 тиков, отсюда порядок величин.",
+    "calibration": "matrix-2026-08-20",
+    "$calibration": "Выверено вместе с трейтами: статус сам по себе на исход не влияет, его в бой приносит трейт. Ключевое решение калибровки — tickEvery: периодический эффект, срабатывающий КАЖДЫЙ тик, несоизмеримо сильнее удара, потому что боец при SPD около десяти ходит раз в десять тиков. Второе — maxStacks у обновляемых эффектов: без него chill уводил SPD цели в ноль. Величина одного тика не опускается ниже двух: при единице множители вроде amplifier ×1.3 тонут в округлении, и трейт снова расходится с описанием.",
+    "maxInstances": 5,
+    "bleed": {
+      "damagePerStack": 3,
+      "duration": 60,
+      "tickEvery": 20,
+      "maxStacks": 5
+    },
+    "poison": {
+      "damagePerStack": 2,
+      "duration": 60,
+      "tickEvery": 20,
+      "maxStacks": 5
+    },
+    "burn": {
+      "damagePerStack": 3,
+      "duration": 60,
+      "tickEvery": 20,
+      "maxStacks": 2
+    },
+    "regen": {
+      "healPerStack": 3,
+      "duration": 60,
+      "tickEvery": 20,
+      "maxStacks": 3
+    },
+    "stun": {
+      "duration": 12,
+      "maxStacks": 1
+    },
+    "shield": {
+      "absorbPerStack": 4,
+      "duration": 40,
+      "maxStacks": 6
+    },
+    "hex": {
+      "atkPerStack": -2,
+      "duration": 20,
+      "maxStacks": 4
+    },
+    "fury": {
+      "atkPerStack": 5,
+      "duration": -1,
+      "maxStacks": 6
+    },
+    "chill": {
+      "spdPerStack": -1,
+      "duration": 20,
+      "maxStacks": 2
+    },
+    "enrage": {
+      "attackMultiplierBonus": 0.5,
+      "armorMultiplier": 0.8,
+      "duration": -1,
+      "maxStacks": 1
+    }
+  },
+  "unarmed": {
+    "$source": "M1a",
+    "$note": "Оружие бойца без экипировки. Предметов в базе пока нет (лут — M3), а бой без оружия должен считаться, а не падать. Числа намеренно жалкие: голые кулаки не должны выглядеть рабочим билдом.",
+    "dmgMin": 2,
+    "dmgMax": 4,
+    "ilvl": 1,
+    "class": "light"
+  },
+  "sparring": {
+    "$source": "M1a, вертикальный срез /simulate/preview",
+    "$note": "Спарринг-манекен для оценки шанса победы, пока настоящих противников нет (генерация врагов — M3). Это не контент: у манекена нет ни имени, ни лута, ни поведения, только числа. Уровень берётся от игрока со сдвигом по сложности из raid.difficulty.",
+    "statPerLevel": 1.6,
+    "armorPerLevel": 5,
+    "armorClass": "medium",
+    "weapon": {
+      "dmgMin": 6,
+      "dmgMax": 11,
+      "class": "balanced"
+    }
+  },
   "matchup": {
     "$source": "GDD §4.3, класс оружия × класс брони",
-    "light": { "cloth": 1.15, "light": 1.1, "medium": 1.0, "heavy": 0.85 },
-    "balanced": { "cloth": 1.0, "light": 1.05, "medium": 1.05, "heavy": 1.0 },
-    "heavy": { "cloth": 0.9, "light": 0.9, "medium": 1.05, "heavy": 1.2 }
+    "light": {
+      "cloth": 1.15,
+      "light": 1.1,
+      "medium": 1.0,
+      "heavy": 0.85
+    },
+    "balanced": {
+      "cloth": 1.0,
+      "light": 1.05,
+      "medium": 1.05,
+      "heavy": 1.0
+    },
+    "heavy": {
+      "cloth": 0.9,
+      "light": 0.9,
+      "medium": 1.05,
+      "heavy": 1.2
+    }
   },
-
   "progression": {
     "$source": "GDD §5.2, кап 40, нужно(lv) = 100 × lv^1.35; §5.4 Paragon",
     "levelCap": 40,
-    "xpCurve": { "coefficient": 100, "exponent": 1.35 },
+    "xpCurve": {
+      "coefficient": 100,
+      "exponent": 1.35
+    },
     "traitEveryNLevels": 5,
     "levelUpCardCount": 3,
     "respecCostPerLevel": 200,
     "paragonPerPointBonus": 0.004,
     "paragonChoiceNodeInterval": 25
   },
-
   "items": {
     "$source": "GDD §6.1, базовое_значение = база × (1 + ilvl × 0.04); тиры аффиксов",
     "ilvlScale": 0.04,
-    "affixTierMinIlvl": { "T5": 1, "T4": 8, "T3": 16, "T2": 25, "T1": 34 },
+    "affixTierMinIlvl": {
+      "T5": 1,
+      "T4": 8,
+      "T3": 16,
+      "T2": 25,
+      "T1": 34
+    },
     "affixCountByRarity": {
       "common": [0, 0],
       "magic": [1, 2],
@@ -79,7 +343,6 @@
       "riskFreeThrough": 5
     }
   },
-
   "raid": {
     "$source": "GDD §7.2 и §7.3",
     "fightsPerRun": 5,
@@ -88,12 +351,23 @@
     "lootMultiplierByFight": [1.0, 1.4, 1.8, 2.5],
     "goldKeptOnDeath": 0.5,
     "difficulty": {
-      "normal": { "enemyLevelOffset": -1, "lootMultiplier": 1.0, "legendaryChance": 0.005 },
-      "dangerous": { "enemyLevelOffset": 2, "lootMultiplier": 1.6, "legendaryChance": 0.02 },
-      "nightmare": { "enemyLevelOffset": 5, "lootMultiplier": 2.5, "legendaryChance": 0.06 }
+      "normal": {
+        "enemyLevelOffset": -1,
+        "lootMultiplier": 1.0,
+        "legendaryChance": 0.005
+      },
+      "dangerous": {
+        "enemyLevelOffset": 2,
+        "lootMultiplier": 1.6,
+        "legendaryChance": 0.02
+      },
+      "nightmare": {
+        "enemyLevelOffset": 5,
+        "lootMultiplier": 2.5,
+        "legendaryChance": 0.06
+      }
     }
   },
-
   "boss": {
     "$source": "GDD §7.5",
     "enrageHpThreshold": 0.3,
@@ -101,12 +375,14 @@
     "enrageDefensePenalty": 0.2,
     "heavyStrikeEveryNTicks": 8
   },
-
   "arena": {
     "$source": "GDD §8",
     "attemptsPerDay": 5,
     "eloMatchWindow": 150,
     "seasonLengthDays": 14,
-    "seasonEloReset": { "anchor": 1000, "retainedFraction": 0.4 }
+    "seasonEloReset": {
+      "anchor": 1000,
+      "retainedFraction": 0.4
+    }
   }
 }
