@@ -1,0 +1,110 @@
+{
+  "id": "munda",
+  "$comment": "Силуэт Мунды на горизонте. ART-BIBLE §5: «единственное место в игре, нарисованное чисто» — светлое, ровное, недосягаемое. Все узлы помечены origin: city, и только поэтому им разрешены зарезервированные цвета (ART-BIBLE §3); этот же флаг даёт им материал без освещения и без тумана, то есть ровную заливку, которой не касается ничто из происходящего снаружи стены. Собран тем же механизмом, что бойцы и арена: город — не частный случай в коде. ХОЛМА ЗДЕСЬ НЕТ НАМЕРЕННО. Город на холме — это лор (LORE §1), но на таком удалении и при такой темноте тёмная масса под городом либо невидима, либо поглощает стену по глубине и превращает силуэт в чёрную плиту. Оба исхода проверены на скриншоте. Вернётся вместе с настоящим 2D-ассетом горизонта.",
+  "nodes": [
+    {
+      "name": "root",
+      "parent": null,
+      "offset": [0, 0, 0],
+      "size": [0, 0, 0],
+      "color": "ink",
+      "origin": "city"
+    },
+    {
+      "name": "wall",
+      "parent": "root",
+      "offset": [0, 1.1, 0],
+      "size": [34, 3.4, 4],
+      "color": "mundaStone",
+      "origin": "city"
+    },
+    {
+      "name": "wallCapW",
+      "parent": "root",
+      "offset": [-14.5, 3.1, 0],
+      "size": [3.2, 1.2, 4.2],
+      "color": "mundaStone",
+      "origin": "city"
+    },
+    {
+      "name": "wallCapE",
+      "parent": "root",
+      "offset": [14.5, 3.1, 0],
+      "size": [3.2, 1.2, 4.2],
+      "color": "mundaStone",
+      "origin": "city"
+    },
+    {
+      "name": "towerW",
+      "parent": "root",
+      "offset": [-9.5, 4.6, 0],
+      "size": [3.4, 8.2, 3.4],
+      "color": "mundaStone",
+      "origin": "city"
+    },
+    {
+      "name": "towerC",
+      "parent": "root",
+      "offset": [0, 6.6, 0],
+      "size": [4.6, 12.2, 4.6],
+      "color": "mundaStone",
+      "origin": "city"
+    },
+    {
+      "name": "towerE",
+      "parent": "root",
+      "offset": [9.5, 4.6, 0],
+      "size": [3.4, 8.2, 3.4],
+      "color": "mundaStone",
+      "origin": "city"
+    },
+    {
+      "name": "roofW",
+      "parent": "towerW",
+      "offset": [0, 4.9, 0],
+      "size": [2.2, 1.6, 2.2],
+      "color": "mundaGold",
+      "origin": "city"
+    },
+    {
+      "name": "roofC",
+      "parent": "towerC",
+      "offset": [0, 6.9, 0],
+      "size": [2.8, 2.2, 2.8],
+      "color": "mundaGold",
+      "origin": "city"
+    },
+    {
+      "name": "roofE",
+      "parent": "towerE",
+      "offset": [0, 4.9, 0],
+      "size": [2.2, 1.6, 2.2],
+      "color": "mundaGold",
+      "origin": "city"
+    },
+    {
+      "name": "spire",
+      "parent": "roofC",
+      "offset": [0, 2.2, 0],
+      "size": [0.5, 2.6, 0.5],
+      "color": "mundaGold",
+      "origin": "city"
+    },
+    {
+      "name": "houseW",
+      "parent": "root",
+      "offset": [-5.4, 3.3, 0.2],
+      "size": [3.2, 4.2, 3.2],
+      "color": "mundaStone",
+      "origin": "city"
+    },
+    {
+      "name": "houseE",
+      "parent": "root",
+      "offset": [5.4, 3.3, 0.2],
+      "size": [3.2, 4.2, 3.2],
+      "color": "mundaStone",
+      "origin": "city"
+    }
+  ]
+}

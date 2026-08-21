@@ -1,0 +1,109 @@
+{
+  "id": "arena",
+  "$comment": "Окружение арены. Тем же механизмом, что и бойцы: новый объект — запись в данных, а не правка кода. Жаровни несут свет с мерцанием; мерцает СВЕТ, а не материал, потому что материалы разделяются кэшем по цвету (GDD §3.4) и правка материала одной жаровни изменила бы все объекты того же цвета разом.",
+  "nodes": [
+    {
+      "name": "root",
+      "parent": null,
+      "offset": [0, 0, 0],
+      "size": [0, 0, 0],
+      "color": "ink"
+    },
+    {
+      "name": "ground",
+      "parent": "root",
+      "offset": [0, -0.06, 0],
+      "size": [24, 0.12, 24],
+      "color": "ink"
+    },
+    {
+      "name": "floor",
+      "parent": "root",
+      "offset": [0, 0.005, 0],
+      "size": [9, 0.02, 7],
+      "color": "parchment"
+    },
+    {
+      "name": "kerbNorth",
+      "parent": "root",
+      "offset": [0, 0.09, -3.6],
+      "size": [9.4, 0.18, 0.36],
+      "color": "ash"
+    },
+    {
+      "name": "kerbSouth",
+      "parent": "root",
+      "offset": [0, 0.09, 3.6],
+      "size": [9.4, 0.18, 0.36],
+      "color": "ash"
+    },
+    {
+      "name": "kerbWest",
+      "parent": "root",
+      "offset": [-4.7, 0.09, 0],
+      "size": [0.36, 0.18, 7.4],
+      "color": "ash"
+    },
+    {
+      "name": "kerbEast",
+      "parent": "root",
+      "offset": [4.7, 0.09, 0],
+      "size": [0.36, 0.18, 7.4],
+      "color": "ash"
+    },
+    {
+      "name": "postNW",
+      "parent": "root",
+      "offset": [-4.7, 0.7, -3.6],
+      "size": [0.22, 1.4, 0.22],
+      "color": "earth"
+    },
+    {
+      "name": "postNE",
+      "parent": "root",
+      "offset": [4.7, 0.7, -3.6],
+      "size": [0.22, 1.4, 0.22],
+      "color": "earth"
+    },
+    {
+      "name": "postSW",
+      "parent": "root",
+      "offset": [-4.7, 0.7, 3.6],
+      "size": [0.22, 1.4, 0.22],
+      "color": "earth"
+    },
+    {
+      "name": "postSE",
+      "parent": "root",
+      "offset": [4.7, 0.7, 3.6],
+      "size": [0.22, 1.4, 0.22],
+      "color": "earth"
+    },
+    {
+      "name": "brazierW",
+      "parent": "postNW",
+      "offset": [0, 0.78, 0],
+      "size": [0.3, 0.16, 0.3],
+      "color": "flame",
+      "light": {
+        "color": "flame",
+        "intensity": 3.2,
+        "distance": 11,
+        "flicker": 0.22
+      }
+    },
+    {
+      "name": "brazierE",
+      "parent": "postNE",
+      "offset": [0, 0.78, 0],
+      "size": [0.3, 0.16, 0.3],
+      "color": "flame",
+      "light": {
+        "color": "flame",
+        "intensity": 3.2,
+        "distance": 11,
+        "flicker": 0.22
+      }
+    }
+  ]
+}
