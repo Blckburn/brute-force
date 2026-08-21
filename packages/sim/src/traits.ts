@@ -213,11 +213,33 @@ const STR: readonly Trait[] = [
     id: 'cursed',
     school: 'str',
     anchor: true,
-    // «ATK ×1.4, −3 HP за ход». В v1.0 HP не терялись.
-    modify: ({ balance }) => ({ atkMultiplier: num(balance, 'cursed', 'atkMultiplier') }),
+    // «×1.4 урона, доля максимума HP за ход». В v1.0 HP не терялись вовсе.
+    //
+    // ДВЕ правки по результатам матрицы §4.6, обе в GDD §4.5.
+    //
+    // 1. Плата — ДОЛЯ максимума HP, а не плоские три единицы. Плоское
+    //    число не масштабируется: на первом уровне это половина исхода
+    //    боя, на сороковом — ничто.
+    //
+    // 2. Множитель применяется к УРОНУ, а не к стату ATK. Урон считается
+    //    как `оружие × (1 + ATK/60)`, поэтому «ATK ×1.4» при ATK 10 даёт
+    //    +5.7% урона, а не +40%: число в описании не имеет отношения
+    //    к происходящему — ровно претензия §13, пункт 4. Замер: сам
+    //    множитель стата стоит 60% побед против голого носителя, а любая
+    //    осмысленная плата HP уводит трейт к 13–42%. Чтобы окупить
+    //    её статом, понадобился бы ×2.2–×2.6 — число, которое в тултипе
+    //    выглядит нелепо. Как множитель урона 1.4 из документа окупает
+    //    2% HP за ход и даёт 60% при соседях по школе в 51–75%.
+    modify: ({ balance }) => ({
+      outgoingDamageMultiplier: num(balance, 'cursed', 'damageMultiplier'),
+    }),
     hooks: {
       onTurnStart: (ctx) => {
-        const cost = num(ctx.balance, 'cursed', 'hpPerTurn');
+        const share = num(ctx.balance, 'cursed', 'hpFractionPerTurn');
+        // Округление обычное, но не ниже единицы: доля, дающая ноль,
+        // превратила бы трейт в чистый бонус к урону без цены — то есть
+        // в другой трейт.
+        const cost = Math.max(1, Math.round(ctx.self.maxHp * share));
         const applied = Math.min(cost, ctx.self.hp);
         ctx.self.hp -= applied;
         return [
@@ -320,11 +342,25 @@ const DEF: readonly Trait[] = [
     id: 'thorns',
     school: 'def',
     anchor: true,
-    // «Отражает 15% полученного урона». В v1.0 давал fDef × 1.05.
+    // «Отражает долю полученного урона, но не больше потолка за удар».
+    // В v1.0 давал fDef × 1.05, то есть не отражал ничего.
+    //
+    // ДВЕ правки по результатам матрицы §4.6, обе в GDD §4.5.
+    //
+    // 1. Доля снижена с 15%. Отражённый урон идёт МИМО БРОНИ, и в
+    //    зеркальном бою тяжёлых бойцов это решает исход: 88% побед против
+    //    голого носителя при соседях по школе в 50–68% и связка DEF на 95%.
+    //
+    // 2. Появился потолок за удар. Без него отражение тем сильнее, чем
+    //    сильнее бьёт противник, то есть растёт вместе со всей прогрессией
+    //    и с зонами. На первом уровне потолок не срабатывает — он и не
+    //    должен: он ограничивает не сейчас, а дальше.
     hooks: {
       onTakeDamage: (ctx) => {
         const incoming = ctx.amount ?? 0;
-        const reflected = Math.round(incoming * num(ctx.balance, 'thorns', 'reflectFraction'));
+        const share = incoming * num(ctx.balance, 'thorns', 'reflectFraction');
+        const cap = num(ctx.balance, 'thorns', 'maxReflectPerHit');
+        const reflected = Math.round(Math.min(share, cap));
         if (reflected <= 0 || ctx.opponent.hp <= 0) return [];
 
         const applied = Math.min(reflected, ctx.opponent.hp);
@@ -487,8 +523,19 @@ const AGI: readonly Trait[] = [
   {
     id: 'slippery',
     school: 'agi',
+    // Два эффекта, и второй появился по результатам матрицы §4.6.
+    //
+    // Множителя крита ОДНОГО не хватает, и это измерено, а не угадано:
+    // крит противника при AGI 16 добавляет около 9% ожидаемого урона,
+    // поэтому даже полное его подавление даёт потолок в 61.5% побед
+    // при соседях по школе в 57–74%. Дальше двигать было нечего.
+    //
+    // Второй эффект выбран по смыслу трейта: «скользкий» — удары приходят
+    // вскользь. Поле `incomingDamageMultiplier` уже есть, его использует
+    // `innateGuard`; новой механики трейт не вводит.
     modify: ({ balance }) => ({
       enemyCritMultiplier: num(balance, 'slippery', 'enemyCritMultiplier'),
+      incomingDamageMultiplier: 1 - num(balance, 'slippery', 'incomingReduction'),
     }),
     hooks: {},
   },

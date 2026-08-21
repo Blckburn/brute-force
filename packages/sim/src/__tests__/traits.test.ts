@@ -200,17 +200,23 @@ describe('шесть трейтов из аудита v1.0 делают ровн
     expect(modifiersWithState('warlord', { stacks: 2 }).atk).toBe(per * 2);
   });
 
-  it('cursed: ATK ×1.4 и −3 HP за ход — оба, а не только множитель', () => {
-    const mult = T('cursed', 'atkMultiplier');
-    const cost = T('cursed', 'hpPerTurn');
+  it('cursed: урон ×1.4 и доля HP за ход — оба, а не только множитель', () => {
+    const mult = T('cursed', 'damageMultiplier');
+    const share = T('cursed', 'hpFractionPerTurn');
 
-    // Множитель ATK.
+    // Множитель УРОНА, а не стата ATK (GDD 2.5). Разница не косметическая:
+    // урон равен `оружие × (1 + ATK/60)`, поэтому множитель на стате при
+    // ATK 50 дал бы +23% урона вместо +40%, и описание разошлось бы
+    // с поведением ровно так, как в §13 пункт 4.
     const plain = stats({ atk: 50 });
     const damned = stats({ atk: 50, traits: ['cursed'] });
-    expect(damned.atk).toBeCloseTo(plain.atk * mult, 6);
+    expect(damned.outgoingDamageMultiplier).toBeCloseTo(mult, 6);
+    expect(damned.atk, 'стат ATK трейт не трогает').toBeCloseTo(plain.atk, 6);
 
     // Плата HP. В v1.0 её не было вовсе — здесь она в логе числом.
-    const { log } = fight(striker({ traits: ['cursed'] }), dummy(), 'cursed');
+    const carrier = striker({ traits: ['cursed'] });
+    const cost = Math.max(1, Math.round(createFighterState(carrier, balance).maxHp * share));
+    const { log } = fight(carrier, dummy(), 'cursed');
     const turns = fires(log.events, 'cursed', 0);
     expect(turns.length, 'ни одного хода — платить нечем').toBeGreaterThan(3);
 
@@ -231,6 +237,135 @@ describe('шесть трейтов из аудита v1.0 делают ровн
     // в ту же выборку.
     const selfHits = log.events.filter((e) => e.t === 'damage' && e.target === 0 && e.amount > 0);
     expect(selfHits.length).toBe(turns.length);
+  });
+
+  it('cursed: плата МАСШТАБИРУЕТСЯ — вдвое больше HP значит вдвое больше платы', () => {
+    // Ради этого плоское число и заменено долей (GDD 2.5): на первом
+    // уровне три HP были половиной исхода боя, на сороковом — ничем.
+    const share = T('cursed', 'hpFractionPerTurn');
+    const paid = (bonusHp: number) => {
+      const carrier = striker({ traits: ['cursed'], pathBonusHp: bonusHp });
+      const { log } = fight(carrier, dummy({ pathBonusHp: 4000 }), 'cursed-scale');
+      const first = fires(log.events, 'cursed', 0)[0];
+      return {
+        note: Number(String(first?.t === 'trait_fire' ? first.note : '').replace('hp-', '')),
+        maxHp: createFighterState(carrier, balance).maxHp,
+      };
+    };
+
+    const small = paid(0);
+    const large = paid(small.maxHp);
+
+    expect(large.maxHp).toBe(small.maxHp * 2);
+    expect(small.note).toBe(Math.max(1, Math.round(small.maxHp * share)));
+    expect(large.note).toBe(Math.max(1, Math.round(large.maxHp * share)));
+    // И это РАЗНЫЕ числа: при плоской плате обе строки совпали бы,
+    // и тест прошёл бы, не заметив, что масштабирования нет.
+    expect(large.note).toBeGreaterThan(small.note);
+  });
+
+  it('thorns: потолок отражения за удар держит сильный удар', () => {
+    const frac = T('thorns', 'reflectFraction');
+    const cap = T('thorns', 'maxReflectPerHit');
+
+    // Удар, у которого доля ЗАВЕДОМО выше потолка. На первом уровне такого
+    // не бывает — потолок и заведён не для сейчас, а для прогрессии, —
+    // поэтому проверяется он прямым вызовом хука, а не боем.
+    const huge = Math.ceil((cap / frac) * 3);
+    expect(huge * frac, 'удар слабее потолка — потолок проверять нечем').toBeGreaterThan(cap);
+
+    const self = createFighterState(fighter({ traits: ['thorns'] }), balance);
+    const foe = createFighterState(fighter({ pathBonusHp: 5000 }), balance);
+    const before = foe.hp;
+
+    traitDefinition('thorns').hooks.onTakeDamage!({
+      self,
+      selfIndex: 0,
+      opponent: foe,
+      opponentIndex: 1,
+      balance,
+      rng: { next: () => 0, chance: () => false, int: () => 0 } as never,
+      clock: createStatusClock(),
+      state: createTraitState(),
+      amount: huge,
+    });
+
+    expect(before - foe.hp).toBe(Math.round(cap));
+
+    // А удар НИЖЕ потолка отражается долей, а не потолком — иначе трейт
+    // превратился бы в «всегда столько-то», и доля перестала бы значить.
+    const smallHit = Math.floor(cap / frac / 3);
+    const foe2 = createFighterState(fighter({ pathBonusHp: 5000 }), balance);
+    const before2 = foe2.hp;
+    traitDefinition('thorns').hooks.onTakeDamage!({
+      self,
+      selfIndex: 0,
+      opponent: foe2,
+      opponentIndex: 1,
+      balance,
+      rng: { next: () => 0, chance: () => false, int: () => 0 } as never,
+      clock: createStatusClock(),
+      state: createTraitState(),
+      amount: smallHit,
+    });
+    expect(before2 - foe2.hp).toBe(Math.round(smallHit * frac));
+    expect(before2 - foe2.hp).toBeLessThan(cap);
+  });
+
+  it('slippery: режет и крит противника, и входящий урон', () => {
+    const reduction = T('slippery', 'incomingReduction');
+    const critMult = T('slippery', 'enemyCritMultiplier');
+    const passive = stats({ traits: ['slippery'] });
+
+    expect(passive.enemyCritMultiplier).toBe(critMult);
+    expect(passive.incomingDamageMultiplier).toBeCloseTo(1 - reduction, 6);
+
+    // Оба эффекта нужны: множителя крита одного не хватало до уровня
+    // школы, это замерено матрицей §4.6 (GDD 2.5). Проверяем, что второй
+    // действительно доходит до урона, а не остаётся в статах.
+    //
+    // Сравнивается СРЕДНИЙ УРОН ЗА УДАР по многим боям. Два тупика,
+    // в которые этот тест успел попасть, стоят того, чтобы их назвать:
+    //
+    //  - на ОДНОМ ударе четыре процента меньше шага округления: 16.4
+    //    и 15.7 дают одно и то же целое. Хуже того, у обвязки оружие
+    //    бьёт фиксированные 10, поэтому одинаково округляется КАЖДЫЙ
+    //    удар во всех боях сразу — тест был бы зелёным при полностью
+    //    отключённом множителе. Отсюда оружие с разбросом ниже.
+    //  - СУММА урона за бой не годится тем более: она упирается в запас
+    //    HP цели и потому одинакова при любом множителе. Слабее бьёшь —
+    //    дольше бьёшь, итог тот же.
+    const attacker = striker({
+      atk: 30,
+      agi: 0,
+      critBonus: -1,
+      weapon: { dmgMin: 8, dmgMax: 14, ilvl: 1, class: 'balanced' },
+    });
+
+    const perHit = (traits: TraitId[]) => {
+      let total = 0;
+      let hits = 0;
+      for (let i = 0; i < 40; i++) {
+        const { log } = resolveBattle(
+          [attacker, dummy({ pathBonusHp: 4000, traits })] as BattleSetup,
+          balance,
+          `slippery-dmg-${i}`,
+        );
+        for (const e of log.events) {
+          if (e.t !== 'damage' || e.target !== 1 || e.amount <= 0) continue;
+          total += e.amount;
+          hits++;
+        }
+      }
+      return { avg: total / hits, hits };
+    };
+
+    const plain = perHit([]);
+    const slick = perHit(['slippery']);
+
+    expect(plain.hits, 'ударов не было — сравнивать нечего').toBeGreaterThan(1000);
+    expect(slick.avg).toBeLessThan(plain.avg);
+    expect(slick.avg / plain.avg).toBeCloseTo(1 - reduction, 2);
   });
 
   it('fortress: блок гасит урон полностью', () => {
@@ -1207,8 +1342,8 @@ describe('описания сверены с реализацией', () => {
      */
     const claims: Array<[TraitId, string, number]> = [
       ['warlord', 'atkPerKill', T('warlord', 'atkPerKill')],
-      ['cursed', 'atkMultiplier', T('cursed', 'atkMultiplier')],
-      ['cursed', 'hpPerTurn', T('cursed', 'hpPerTurn')],
+      ['cursed', 'damageMultiplier', T('cursed', 'damageMultiplier')],
+      ['cursed', 'hpFractionPerTurn', T('cursed', 'hpFractionPerTurn') * 100],
       ['executioner', 'hpThreshold', T('executioner', 'hpThreshold') * 100],
       ['executioner', 'damageMultiplier', T('executioner', 'damageMultiplier')],
       ['bloodlust', 'chance', T('bloodlust', 'chance') * 100],
@@ -1216,6 +1351,8 @@ describe('описания сверены с реализацией', () => {
       ['ironGrip', 'armorPenetration', T('ironGrip', 'armorPenetration') * 100],
       ['butcher', 'damageBonusVsBleeding', T('butcher', 'damageBonusVsBleeding') * 100],
       ['thorns', 'reflectFraction', T('thorns', 'reflectFraction') * 100],
+      ['thorns', 'maxReflectPerHit', T('thorns', 'maxReflectPerHit')],
+      ['slippery', 'incomingReduction', T('slippery', 'incomingReduction') * 100],
       ['secondWind', 'hpThreshold', T('secondWind', 'hpThreshold') * 100],
       ['bulwark', 'shieldStacks', T('bulwark', 'shieldStacks')],
       ['stoneskin', 'armorMultiplier', (T('stoneskin', 'armorMultiplier') - 1) * 100],
