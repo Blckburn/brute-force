@@ -1,6 +1,14 @@
 import { paletteColor } from '@extramundum/data';
-import type { RigSlot, RigSpec } from '@extramundum/shared';
-import { BoxGeometry, Group, Mesh, Object3D, PointLight } from 'three';
+import type { RigShape, RigSlot, RigSpec } from '@extramundum/shared';
+import {
+  BoxGeometry,
+  BufferGeometry,
+  Float32BufferAttribute,
+  Group,
+  Mesh,
+  Object3D,
+  PointLight,
+} from 'three';
 
 import type { MaterialCache } from './materials.js';
 
@@ -47,17 +55,24 @@ export type BuiltRig = {
  * буферов, и каждый занимал бы свою память на GPU.
  */
 export class GeometryCache {
-  private readonly bySize = new Map<string, BoxGeometry>();
+  /** Ключ — «форма:ширина:высота:глубина». Одна геометрия на габарит. */
+  private readonly bySize = new Map<string, BufferGeometry>();
 
   get size(): number {
     return this.bySize.size;
   }
 
-  get(w: number, h: number, d: number): BoxGeometry {
-    const key = `${w}:${h}:${d}`;
+  get(w: number, h: number, d: number, shape: RigShape = 'box'): BufferGeometry {
+    const key = `${shape}:${w}:${h}:${d}`;
     const existing = this.bySize.get(key);
     if (existing !== undefined) return existing;
-    const geometry = new BoxGeometry(w, h, d);
+
+    const geometry =
+      shape === 'box'
+        ? new BoxGeometry(w, h, d)
+        : shape === 'pyramid'
+          ? pyramid(w, h, d)
+          : gable(w, h, d);
     this.bySize.set(key, geometry);
     return geometry;
   }
@@ -68,10 +83,84 @@ export class GeometryCache {
   }
 }
 
+/**
+ * Четырёхскатная пирамида с прямоугольным основанием.
+ *
+ * Собирается вручную, а не из `ConeGeometry`: у конуса основание —
+ * вписанный многоугольник, то есть при четырёх сегментах квадрат,
+ * повёрнутый на 45°, и задать разные ширину и глубину нечем. Башне
+ * города нужен ровно прямоугольник основания.
+ */
+function pyramid(w: number, h: number, d: number): BufferGeometry {
+  const [x, y, z] = [w / 2, h / 2, d / 2];
+  const apex = [0, y, 0];
+  const base = [
+    [-x, -y, z],
+    [x, -y, z],
+    [x, -y, -z],
+    [-x, -y, -z],
+  ];
+  const tris: number[] = [];
+  for (let i = 0; i < 4; i++) {
+    const a = base[i] as number[];
+    const b = base[(i + 1) % 4] as number[];
+    tris.push(...a, ...b, ...apex);
+  }
+  // Дно: две треугольные грани. Снизу его не видно, но без них
+  // силуэт сбоку проваливается.
+  tris.push(...(base[0] as number[]), ...(base[2] as number[]), ...(base[1] as number[]));
+  tris.push(...(base[0] as number[]), ...(base[3] as number[]), ...(base[2] as number[]));
+  return fromTriangles(tris);
+}
+
+/** Двускатная крыша: треугольная призма, конёк вдоль оси Z. */
+function gable(w: number, h: number, d: number): BufferGeometry {
+  const [x, y, z] = [w / 2, h / 2, d / 2];
+  const tris: number[] = [];
+  const push = (...points: number[][]) => {
+    for (const p of points) tris.push(...p);
+  };
+  // Два ската.
+  push([-x, -y, z], [0, y, z], [0, y, -z]);
+  push([-x, -y, z], [0, y, -z], [-x, -y, -z]);
+  push([x, -y, -z], [0, y, -z], [0, y, z]);
+  push([x, -y, -z], [0, y, z], [x, -y, z]);
+  // Два фронтона.
+  push([-x, -y, z], [x, -y, z], [0, y, z]);
+  push([x, -y, -z], [-x, -y, -z], [0, y, -z]);
+  // Дно.
+  push([-x, -y, -z], [x, -y, -z], [x, -y, z]);
+  push([-x, -y, -z], [x, -y, z], [-x, -y, z]);
+  return fromTriangles(tris);
+}
+
+function fromTriangles(positions: number[]): BufferGeometry {
+  const geometry = new BufferGeometry();
+  geometry.setAttribute('position', new Float32BufferAttribute(positions, 3));
+  // Нормали нужны Lambert; у городских материалов света нет, но одна
+  // и та же геометрия может достаться и обычному узлу.
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+/**
+ * Подмена цветов при сборке: ключ палитры -> ключ палитры.
+ *
+ * Нужна затем, чтобы два бойца из ОДНОЙ спецификации отличались друг
+ * от друга. Заводить вторую спецификацию ради другого цвета плаща
+ * значило бы копировать двадцать пять узлов ради двух строк, а копия
+ * через месяц расходится с оригиналом.
+ *
+ * Подменяется только КЛЮЧ, а не цвет: подставить сюда произвольный hex
+ * нельзя, и палитра остаётся единственным источником цвета.
+ */
+export type ColorOverrides = ReadonlyMap<string, string>;
+
 export function buildRig(
   spec: RigSpec,
   materials: MaterialCache,
   geometries: GeometryCache,
+  overrides?: ColorOverrides,
 ): BuiltRig {
   const nodes = new Map<string, Object3D>();
   const slots = new Map<RigSlot, Mesh[]>();
@@ -88,10 +177,11 @@ export function buildRig(
     // Невидимый меш всё равно стоил бы обхода и места в сцене.
     // Вид материала — из данных: узел городского происхождения получает
     // чистую заливку без света и тумана (ART-BIBLE §3 и §5).
+    const colorKey = overrides?.get(node.color) ?? node.color;
     const object: Object3D = isMesh
       ? new Mesh(
-          geometries.get(w, h, d),
-          materials.get(paletteColor(node.color), node.origin === 'city' ? 'city' : 'world'),
+          geometries.get(w, h, d, node.shape),
+          materials.get(paletteColor(colorKey), node.origin === 'city' ? 'city' : 'world'),
         )
       : new Object3D();
 

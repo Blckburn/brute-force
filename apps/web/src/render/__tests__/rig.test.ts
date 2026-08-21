@@ -1,5 +1,5 @@
 import { RIGS } from '@extramundum/data';
-import { RIG_SLOTS, rigSpecSchema, type RigSpec } from '@extramundum/shared';
+import { RIG_SHAPES, RIG_SLOTS, rigSpecSchema, type RigSpec } from '@extramundum/shared';
 import { describe, expect, it } from 'vitest';
 import { Mesh, PointLight } from 'three';
 
@@ -119,6 +119,126 @@ describe('восемь слотов экипировки', () => {
     expect(rig.slots.get('bracers')).toHaveLength(2);
     expect(rig.slots.get('boots')).toHaveLength(2);
     expect(rig.slots.get('helmet')).toHaveLength(1);
+  });
+});
+
+describe('формы из спецификации', () => {
+  /** Коробка, пирамида и двускатная крыша при одинаковом габарите. */
+  const shaped = (shape: (typeof RIG_SHAPES)[number]) =>
+    build(
+      rigSpecSchema.parse({
+        id: `shape-${shape}`,
+        nodes: [
+          { name: 'n', parent: null, offset: [0, 0, 0], size: [2, 3, 4], color: 'bone', shape },
+        ],
+      }),
+    ).rig.nodes.get('n') as Mesh;
+
+  const vertexCount = (mesh: Mesh) =>
+    (mesh.geometry.getAttribute('position') as { count: number }).count;
+
+  const bounds = (mesh: Mesh) => {
+    mesh.geometry.computeBoundingBox();
+    const box = mesh.geometry.boundingBox!;
+    return [box.max.x - box.min.x, box.max.y - box.min.y, box.max.z - box.min.z];
+  };
+
+  it('форма берётся из данных: три формы дают три разные геометрии', () => {
+    // Сравниваются САМИ ВЕРШИНЫ, а не их число: у коробки и двускатной
+    // крыши вершин поровну (по 24), и счётчик объявил бы их одинаковыми.
+    const shapeOf = (shape: (typeof RIG_SHAPES)[number]) => {
+      const attribute = shaped(shape).geometry.getAttribute('position') as {
+        array: ArrayLike<number>;
+      };
+      return Array.from(attribute.array)
+        .map((v) => v.toFixed(3))
+        .join(',');
+    };
+
+    const distinct = new Set(RIG_SHAPES.map(shapeOf));
+    expect(distinct.size, 'поле shape читается, но ни на что не влияет').toBe(RIG_SHAPES.length);
+  });
+
+  it('каждая форма укладывается в заявленный габарит', () => {
+    // Пирамида и крыша заданы вручную, а не примитивом three: у конуса
+    // основание — вписанный многоугольник, и прямоугольное основание им
+    // не задать. Значит габарит надо проверять, а не предполагать.
+    for (const shape of RIG_SHAPES) {
+      const [w, h, d] = bounds(shaped(shape));
+      expect(w, `${shape}: ширина`).toBeCloseTo(2, 5);
+      expect(h, `${shape}: высота`).toBeCloseTo(3, 5);
+      expect(d, `${shape}: глубина`).toBeCloseTo(4, 5);
+    }
+  });
+
+  it('умолчание — коробка: стиль проекта не требует записи в данных', () => {
+    const withoutShape = build(
+      rigSpecSchema.parse({
+        id: 'default',
+        nodes: [{ name: 'n', parent: null, offset: [0, 0, 0], size: [2, 3, 4], color: 'bone' }],
+      }),
+    ).rig.nodes.get('n') as Mesh;
+
+    expect(vertexCount(withoutShape)).toBe(vertexCount(shaped('box')));
+  });
+
+  it('кэш геометрий различает формы одного габарита', () => {
+    const geometries = new GeometryCache();
+    const box = geometries.get(1, 1, 1, 'box');
+    const pyramid = geometries.get(1, 1, 1, 'pyramid');
+
+    expect(pyramid).not.toBe(box);
+    expect(geometries.get(1, 1, 1, 'pyramid')).toBe(pyramid);
+    expect(geometries.size).toBe(2);
+  });
+
+  it('город построен формами, а не одними коробками', () => {
+    // Прямоугольные башни одинаковой ширины с плоскими верхушками
+    // читаются современным мегаполисом — так и вышло на первом
+    // скриншоте M2a. Раннесредневековый город держится на силуэте.
+    const shapes = new Set(RIGS.munda.nodes.flatMap((node) => (node.shape ? [node.shape] : [])));
+    expect(shapes.has('pyramid'), 'нет островерхих башен').toBe(true);
+    expect(shapes.has('gable'), 'нет скатных крыш').toBe(true);
+
+    // И высоты разные: ряд одинаковых башен — тот же мегаполис.
+    const heights = RIGS.munda.nodes
+      .filter((n) => n.name.startsWith('tower'))
+      .map((n) => n.size[1]);
+    expect(heights.length).toBeGreaterThan(2);
+    expect(new Set(heights).size, 'все башни одной высоты').toBeGreaterThan(2);
+  });
+});
+
+describe('подмена цветов при сборке', () => {
+  it('два бойца из одной спецификации отличаются цветом', () => {
+    const materials = new MaterialCache();
+    const geometries = new GeometryCache();
+
+    const plain = buildRig(RIGS.humanoid, materials, geometries);
+    const swapped = buildRig(
+      RIGS.humanoid,
+      materials,
+      geometries,
+      new Map([['parchment', 'ochre']]),
+    );
+
+    const hex = (rig: typeof plain, node: string) =>
+      (
+        (rig.nodes.get(node) as Mesh).material as { color: { getHexString(): string } }
+      ).color.getHexString();
+
+    expect(hex(swapped, 'torso')).not.toBe(hex(plain, 'torso'));
+    // Не задетые подменой узлы остались прежними — иначе это не подмена,
+    // а перекраска всего рига.
+    expect(hex(swapped, 'head')).toBe(hex(plain, 'head'));
+  });
+
+  it('подменяется КЛЮЧ палитры, а не произвольный цвет', () => {
+    const materials = new MaterialCache();
+    const geometries = new GeometryCache();
+    expect(() =>
+      buildRig(RIGS.humanoid, materials, geometries, new Map([['parchment', '#ff00ff']])),
+    ).toThrow(/нет цвета/);
   });
 });
 

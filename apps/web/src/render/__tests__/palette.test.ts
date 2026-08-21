@@ -48,23 +48,25 @@ describe('палитра покрывает арт-библию', () => {
     expect(loud, 'цвет слишком насыщенный для гравюры').toEqual([]);
   });
 
-  it('городской цвет заметно отличается от обычных — иначе он не маркер', () => {
-    const saturation = (hex: string) => toHsl(hex).s;
+  it('самое светлое в палитре принадлежит городу — иначе он не маркер', () => {
+    const lightness = (hex: string) => toHsl(hex).l;
     const ordinary = Object.values(palette).filter((e) => !e.reserved);
     const city = Object.values(palette).filter((e) => e.reserved);
 
     expect(city.length).toBeGreaterThan(0);
-    const loudestOrdinary = Math.max(...ordinary.map((e) => saturation(e.hex)));
-    const loudestCity = Math.max(...city.map((e) => saturation(e.hex)));
+    expect(Math.max(...city.map((e) => lightness(e.hex)))).toBeGreaterThan(
+      Math.max(...ordinary.map((e) => lightness(e.hex))),
+    );
 
-    // ART-BIBLE §3: игрок узнаёт городскую вещь до того, как прочтёт
-    // название. Значит разница обязана быть видимой, а не формальной.
-    expect(loudestCity).toBeGreaterThan(loudestOrdinary);
-
-    // И чистая белизна тоже городская: самый светлый цвет палитры
-    // принадлежит Мунде, а не обычному миру.
-    const lightest = (list: typeof ordinary) => Math.max(...list.map((e) => toHsl(e.hex).l));
-    expect(lightest(city)).toBeGreaterThan(lightest(ordinary));
+    // ЧЕГО ЗДЕСЬ НЕТ И ПОЧЕМУ. Раньше тут стояло «городской цвет
+    // насыщеннее любого обычного». Утверждение оказалось выдуманным:
+    // самый насыщенный цвет мира — `flame`, огонь жаровни, и он законно
+    // теплее приглушённого городского золота. Требовать обратного значило
+    // бы гнать палитру под тест, а не тест под арт-библию.
+    //
+    // Настоящий маркер города — не насыщенность, а ЯРКОСТЬ и другой
+    // способ отрисовки: заливка без света и без тумана. Второе проверяет
+    // тест «городское рисуется иначе, чем всё остальное» ниже.
   });
 });
 
@@ -109,6 +111,38 @@ describe('золото зарезервировано за Мундой', () => 
         'city',
       );
     }
+  });
+
+  it('городское рисуется ИНАЧЕ: без света и без тумана', () => {
+    // ART-BIBLE §3: «всё, что пришло из Мунды, светится иначе, чем всё
+    // остальное». Это свойство материала, а не подобранный оттенок:
+    // городской узел получает ровную заливку, которой не касается ни свет
+    // сцены, ни расстояние. Иначе город тонет в тумане — что и показал
+    // первый скриншот M2a.
+    const built = createBattleScene();
+    let city = 0;
+    let world = 0;
+
+    built.scene.traverse((object) => {
+      if (!(object instanceof Mesh)) return;
+      const material = object.material as { isMeshBasicMaterial?: boolean; fog: boolean };
+      if (built.cityNodes.has(object)) {
+        expect(material.isMeshBasicMaterial, `${object.name}: город освещается как мир`).toBe(true);
+        expect(material.fog, `${object.name}: город съедает туман`).toBe(false);
+        city += 1;
+      } else {
+        expect(
+          material.isMeshBasicMaterial,
+          `${object.name}: обычный объект не лепится светом`,
+        ).not.toBe(true);
+        world += 1;
+      }
+    });
+
+    expect(city, 'городских мешей нет — проверять нечего').toBeGreaterThan(0);
+    expect(world, 'обычных мешей нет — сравнивать не с чем').toBeGreaterThan(0);
+
+    built.dispose();
   });
 
   it('в собранной сцене зарезервированный материал принадлежит только Мунде', () => {

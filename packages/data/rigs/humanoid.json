@@ -1,9 +1,14 @@
 {
   "id": "humanoid",
-  "$comment": "Боец. Стиль коробок из v1.0 сохранён намеренно (GDD §3.4) — это идентичность проекта, а не техническое ограничение. Все восемь слотов экипировки из GDD §5.3 присутствуют: они видны на риге, и это бесплатный визуальный прогресс. Единицы — метры сцены, ось Y вверх, ступни на нуле.",
+  "$comment": "Боец. Стиль коробок из v1.0 сохранён намеренно (GDD §3.4) — это идентичность проекта, а не техническое ограничение. Все восемь слотов экипировки из GDD §5.3 присутствуют: они видны на риге, и это бесплатный визуальный прогресс. Единицы — метры сцены, ось Y вверх, ступни на нуле. Цвета подобраны на читаемость: боец — объект, на который игрок смотрит весь бой, и тонуть в тёмном фоне он не должен. Двух бойцов различают не второй спецификацией, а подменой ключей палитры при сборке (ColorOverrides в rig.ts): копия двадцати пяти узлов ради другого цвета плаща через месяц разошлась бы с оригиналом.",
   "nodes": [
-    { "name": "root", "parent": null, "offset": [0, 0, 0], "size": [0, 0, 0], "color": "ink" },
-
+    {
+      "name": "root",
+      "parent": null,
+      "offset": [0, 0, 0],
+      "size": [0, 0, 0],
+      "color": "ink"
+    },
     {
       "name": "pelvis",
       "parent": "root",
@@ -25,7 +30,6 @@
       "size": [0.24, 0.26, 0.24],
       "color": "bone"
     },
-
     {
       "name": "armUpperL",
       "parent": "torso",
@@ -47,7 +51,6 @@
       "size": [0.12, 0.12, 0.12],
       "color": "bone"
     },
-
     {
       "name": "armUpperR",
       "parent": "torso",
@@ -69,57 +72,54 @@
       "size": [0.12, 0.12, 0.12],
       "color": "bone"
     },
-
     {
       "name": "legUpperL",
       "parent": "pelvis",
       "offset": [-0.11, -0.3, 0],
       "size": [0.16, 0.42, 0.16],
-      "color": "earth"
+      "color": "ash"
     },
     {
       "name": "legLowerL",
       "parent": "legUpperL",
       "offset": [0, -0.41, 0],
       "size": [0.14, 0.4, 0.14],
-      "color": "earth"
+      "color": "ash"
     },
     {
       "name": "footL",
       "parent": "legLowerL",
       "offset": [0, -0.25, 0.04],
       "size": [0.16, 0.1, 0.24],
-      "color": "ink"
+      "color": "earth"
     },
-
     {
       "name": "legUpperR",
       "parent": "pelvis",
       "offset": [0.11, -0.3, 0],
       "size": [0.16, 0.42, 0.16],
-      "color": "earth"
+      "color": "ash"
     },
     {
       "name": "legLowerR",
       "parent": "legUpperR",
       "offset": [0, -0.41, 0],
       "size": [0.14, 0.4, 0.14],
-      "color": "earth"
+      "color": "ash"
     },
     {
       "name": "footR",
       "parent": "legLowerR",
       "offset": [0, -0.25, 0.04],
       "size": [0.16, 0.1, 0.24],
-      "color": "ink"
+      "color": "earth"
     },
-
     {
       "name": "slotHelmet",
       "parent": "head",
       "offset": [0, 0.11, 0],
       "size": [0.28, 0.14, 0.28],
-      "color": "ash",
+      "color": "tin",
       "slot": "helmet"
     },
     {
@@ -127,7 +127,7 @@
       "parent": "torso",
       "offset": [0, 0.02, 0],
       "size": [0.48, 0.38, 0.28],
-      "color": "ash",
+      "color": "tin",
       "slot": "chest"
     },
     {
@@ -151,7 +151,7 @@
       "parent": "footL",
       "offset": [0, 0.02, 0],
       "size": [0.18, 0.12, 0.26],
-      "color": "ash",
+      "color": "tin",
       "slot": "boots"
     },
     {
@@ -159,7 +159,7 @@
       "parent": "footR",
       "offset": [0, 0.02, 0],
       "size": [0.18, 0.12, 0.26],
-      "color": "ash",
+      "color": "tin",
       "slot": "boots"
     },
     {
@@ -183,7 +183,7 @@
       "parent": "handR",
       "offset": [0, 0.36, 0.02],
       "size": [0.08, 0.8, 0.04],
-      "color": "ash",
+      "color": "tin",
       "slot": "weapon"
     },
     {
@@ -191,7 +191,7 @@
       "parent": "handL",
       "offset": [-0.04, 0.0, 0.08],
       "size": [0.4, 0.5, 0.06],
-      "color": "tin",
+      "color": "ash",
       "slot": "offhand"
     }
   ]
