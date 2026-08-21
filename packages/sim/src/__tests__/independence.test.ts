@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { resolveAttack } from '../damage.js';
 import { createFighterState } from '../fighter.js';
-import { rngFromSeed } from '../rng.js';
+import { rngFromSeed, type Rng } from '../rng.js';
 import { balance, fighter } from './helpers.js';
 
 /**
@@ -180,6 +180,108 @@ describe('сам генератор', () => {
     }
 
     expect(seen.size).toBe(5);
+  });
+
+  it('число бросков за удар не зависит от бойцов при одинаковом исходе', () => {
+    // Свойство, ради которого `chance` тратит бросок и на границах,
+    // а шаги 0 и 2 бросают безусловно. Без него два билда, отличающиеся
+    // одним коэффициентом, расходятся ПОТОКОМ генератора, и матрица
+    // винрейтов §4.6 меряет смещение выборки вместо силы правки: ровно
+    // так `slippery` с нулевым множителем крита показал на четыре пункта
+    // больше, чем с множителем 0.05.
+    //
+    // Сравниваются пары, у которых исход обязан совпасть ПОЛНОСТЬЮ:
+    // трейт с нулевым шансом избегания ничего не меняет, щит с нулевым
+    // шансом блока — тоже. Значит и бросков должно уйти поровну.
+    const counted = (seed: string) => {
+      const base = rngFromSeed(seed);
+      let draws = 0;
+      const rng: Rng = {
+        next: () => (draws++, base.next()),
+        int: (a, b) => (draws++, base.int(a, b)),
+        chance: (p) => (draws++, base.chance(p)),
+        state: () => base.state(),
+      };
+      return { rng, draws: () => draws };
+    };
+
+    const hit = (defender: Parameters<typeof fighter>[0], seed: string) => {
+      const { rng, draws } = counted(seed);
+      const a = createFighterState(fighter({ atk: 20, accuracy: 5 }), balance);
+      const d = createFighterState(fighter(defender), balance);
+      const outcome = resolveAttack(a, d, balance, rng, 0, 1);
+      return { kind: outcome.kind, draws: draws() };
+    };
+
+    const deadShield = { blockChance: 0, blockReduction: 0.3, ilvl: 1 };
+    const pairs: Array<[string, Parameters<typeof fighter>[0], Parameters<typeof fighter>[0]]> = [
+      // Щит, который никогда не срабатывает, против отсутствия щита.
+      ['щит с нулевым блоком', { agi: 20 }, { agi: 20, shield: deadShield }],
+    ];
+
+    let sameOutcome = 0;
+    let hits = 0;
+    let misses = 0;
+
+    for (let i = 0; i < 300; i++) {
+      for (const [name, left, right] of pairs) {
+        const a = hit(left, `draws-${i}`);
+        const b = hit(right, `draws-${i}`);
+        expect(b.kind, `${name}: исход разошёлся, сравнивать броски нельзя`).toBe(a.kind);
+        expect(b.draws, `${name}: разное число бросков при одинаковом исходе`).toBe(a.draws);
+        sameOutcome++;
+        if (a.kind === 'hit') hits++;
+        else misses++;
+      }
+    }
+
+    // В выборке ЕСТЬ и попадания, и промахи: у них разное число бросков,
+    // и проверка выше без обоих доказывала бы только одну ветку.
+    expect(sameOutcome).toBe(300);
+    expect(hits, 'ни одного попадания в выборке').toBeGreaterThan(30);
+    expect(misses, 'ни одного промаха в выборке').toBeGreaterThan(10);
+  });
+
+  it('ветки удара тратят разное, но фиксированное число бросков', () => {
+    // Числа заданы пайплайном §4.2: избегание — 1 бросок, уклонение — 2,
+    // попадание — 5 (избегание, уклонение, блок, урон оружия, крит).
+    // Проверка не на «одинаково», а на КОНКРЕТНЫЕ значения: иначе
+    // генератор, не тратящий ничего, прошёл бы её с нулями.
+    const run = (defender: Parameters<typeof fighter>[0], seed: string) => {
+      const base = rngFromSeed(seed);
+      let draws = 0;
+      const rng: Rng = {
+        next: () => (draws++, base.next()),
+        int: (a, b) => (draws++, base.int(a, b)),
+        chance: (p) => (draws++, base.chance(p)),
+        state: () => base.state(),
+      };
+      const a = createFighterState(fighter({ atk: 20, accuracy: 0 }), balance);
+      const d = createFighterState(fighter(defender), balance);
+      return { kind: resolveAttack(a, d, balance, rng, 0, 1).kind, draws };
+    };
+
+    const seen = new Map<number, number>();
+    for (let i = 0; i < 600; i++) {
+      const r = run({ agi: 40 }, `branch-${i}`);
+      seen.set(r.draws, (seen.get(r.draws) ?? 0) + 1);
+    }
+
+    // Без трейта избегания остаются две ветки: уклонение (2), попадание (5).
+    expect([...seen.keys()].sort((x, y) => x - y)).toEqual([2, 5]);
+    expect(seen.get(2), 'уклонений не было').toBeGreaterThan(20);
+    expect(seen.get(5), 'попаданий не было').toBeGreaterThan(20);
+
+    // Ветка избегания — ровно один бросок. Носителю даётся столько стеков
+    // трейта, чтобы шанс упёрся в единицу: иначе она попадалась бы редко
+    // и проверялась бы через раз.
+    const avoidSeen = new Set<number>();
+    for (let i = 0; i < 200; i++) {
+      const r = run({ agi: 0, traits: Array(12).fill('phantom' as const) }, `avoid-${i}`);
+      expect(r.kind).toBe('dodged');
+      avoidSeen.add(r.draws);
+    }
+    expect([...avoidSeen]).toEqual([1]);
   });
 
   it('chance на границах отвечает верно и всё равно тратит бросок', () => {

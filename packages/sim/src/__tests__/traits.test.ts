@@ -507,10 +507,14 @@ describe('каждый трейт наблюдаем', () => {
         createFighterState(fighter(), balance),
         balance,
       ).outgoingDamageMultiplier > 1,
+    // Крит вызывается прямым бонусом, а не подстроенной связкой
+    // с `innateAdvocate` на одном сиде: та зависела от того, случится ли
+    // уклонение именно в этом бою, и развалилась, как только поток
+    // генератора сдвинулся от правки в шаге 0 пайплайна.
     overpower: () =>
       applies(
-        fight(striker({ traits: ['overpower', 'innateAdvocate'] }), dummy({ agi: 200 }), 'o').log
-          .events,
+        fight(striker({ traits: ['overpower'], critBonus: 1 }), dummy({ pathBonusHp: 2000 }), 'o')
+          .log.events,
         'stun',
         1,
       ).length > 0,
