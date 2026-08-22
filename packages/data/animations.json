@@ -183,7 +183,8 @@
           "color": "blood",
           "count": 26
         },
-        { "primitive": "shake", "on": "actor", "delayMs": 0, "durationMs": 600, "amount": 0.3 }
+        { "primitive": "shake", "on": "actor", "delayMs": 0, "durationMs": 600, "amount": 0.3 },
+        { "primitive": "topple", "on": "actor", "delayMs": 120, "durationMs": 700, "amount": 1.5 }
       ]
     }
   }

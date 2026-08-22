@@ -41,6 +41,7 @@ export class FighterFx {
   private readonly lunge = idleTrack();
   private readonly shake = idleTrack();
   private readonly flash = idleTrack();
+  private readonly topple = idleTrack();
   private readonly numberAnchor: Object3D;
   private readonly burstAnchor: Object3D;
 
@@ -92,6 +93,17 @@ export class FighterFx {
     this.shake.amount = amount;
   }
 
+  /**
+   * Падение. Единственный трек, который ОСТАЁТСЯ в конечном положении:
+   * убитый боец не поднимается обратно, а обычная развёртка трека
+   * возвращает всё к покою.
+   */
+  startTopple(nowMs: number, durationMs: number, amount: number): void {
+    this.topple.startMs = nowMs;
+    this.topple.durationMs = durationMs;
+    this.topple.amount = amount;
+  }
+
   startFlash(nowMs: number, durationMs: number, amount: number, colorKey: string): void {
     this.flash.startMs = nowMs;
     this.flash.durationMs = durationMs;
@@ -106,7 +118,9 @@ export class FighterFx {
     this.lunge.startMs = -1;
     this.shake.startMs = -1;
     this.flash.startMs = -1;
+    this.topple.startMs = -1;
     this.rig.root.position.x = this.baseX;
+    this.rig.root.rotation.z = 0;
     this.light.intensity = 0;
   }
 
@@ -137,6 +151,14 @@ export class FighterFx {
     const flashT = progress(this.flash, nowMs);
     this.light.intensity =
       flashT < 0 ? 0 : this.stage.flashIntensity * this.flash.amount * (1 - flashT);
+
+    // Падение считается СВОЕЙ развёрткой: обычная гасит эффект после
+    // конца, а упавший обязан остаться лежать. Перемотка назад его
+    // при этом отменяет — тем же сравнением с началом.
+    const toppleT = holdProgress(this.topple, nowMs);
+    // Направление — от противника: боец валится наружу, а не в него.
+    this.rig.root.rotation.z =
+      toppleT < 0 ? 0 : easeOut(toppleT) * this.topple.amount * -this.facing;
   }
 }
 
@@ -150,4 +172,21 @@ function progress(track: Track, nowMs: number): number {
   if (track.startMs < 0 || nowMs < track.startMs) return -1;
   const t = (nowMs - track.startMs) / track.durationMs;
   return t >= 1 ? -1 : t;
+}
+
+/**
+ * То же, но после конца остаётся единицей: эффект доигрывает и ЗАСТЫВАЕТ.
+ *
+ * Перемотка назад по-прежнему его отменяет — сравнением с началом,
+ * а не с концом. Иначе труп оставался бы лежать при отмотке в середину
+ * боя, где он ещё жив.
+ */
+function holdProgress(track: Track, nowMs: number): number {
+  if (track.startMs < 0 || nowMs < track.startMs) return -1;
+  return Math.min(1, (nowMs - track.startMs) / track.durationMs);
+}
+
+/** Замедление к концу: падение начинается резко и укладывается мягко. */
+function easeOut(t: number): number {
+  return 1 - (1 - t) * (1 - t);
 }

@@ -198,6 +198,11 @@ body {
   display: inline-block;
   border-radius: calc(var(--radius) / 2);
   vertical-align: middle;
+  /* Размер НА ЭКРАНЕ задаётся здесь, а не инлайновым стилем: инлайн
+     сильнее файла, и правило вроде `.slots .icon` его не перебивало. */
+  width: 3rem;
+  height: 3rem;
+  font-size: 1.35rem;
 }
 
 .icon--placeholder {
@@ -386,6 +391,10 @@ body {
   flex: 1 1 8rem;
   min-width: 6rem;
   accent-color: var(--accent);
+}
+
+.arena__summary[hidden] {
+  display: none;
 }
 
 .arena__summary {

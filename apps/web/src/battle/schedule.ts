@@ -1,4 +1,10 @@
-import type { AnimationSpec, AnimationStep, BattleEvent, BattleLog } from '@extramundum/shared';
+import type {
+  AnimationPrimitive,
+  AnimationSpec,
+  AnimationStep,
+  BattleEvent,
+  BattleLog,
+} from '@extramundum/shared';
 
 /**
  * Раскладка лога по времени. GDD §3.2, §10.
@@ -85,9 +91,24 @@ export function shownCount(schedule: Schedule, timeMs: number): number {
   return low;
 }
 
-/** Момент начала события с данным индексом — для прокрутки по строке журнала. */
+/** Момент начала события с данным индексом. */
 export function timeOfIndex(schedule: Schedule, index: number): number {
   return schedule.items[index]?.startMs ?? schedule.totalMs;
+}
+
+/**
+ * Момент, когда событие ЗАКОНЧИЛОСЬ. Сюда ведёт клик по строке журнала.
+ *
+ * Не в начало события — и это исправление, а не вкус. Показанным
+ * считается то, что УЖЕ случилось (см. `shownCount`), поэтому перемотка
+ * в начало события делала его непоказанным: строка, по которой только
+ * что кликнули, пряталась вместе с раскрытым разбором броска. Ровно тот
+ * случай, когда «показать мне этот момент» и «этот момент ещё
+ * не наступил» — одно и то же число.
+ */
+export function endOfIndex(schedule: Schedule, index: number): number {
+  const item = schedule.items[index];
+  return item === undefined ? schedule.totalMs : item.startMs + item.holdMs;
 }
 
 /**
@@ -136,6 +157,40 @@ export function timeline(plan: Schedule, spec: AnimationSpec): readonly TimedSte
   // распадаться на отдельные позы.
   steps.sort((a, b) => (a.atMs === b.atMs ? a.index - b.index : a.atMs - b.atMs));
   return steps;
+}
+
+/**
+ * Примитивы, которые НЕ возвращаются к покою.
+ *
+ * Набор, а не флаг в данных: «остаётся ли след» — свойство самого
+ * примитива, а не настройка конкретной анимации. Позволить данным это
+ * переключать значило бы разрешить падение, после которого боец встаёт.
+ */
+export const PERSISTENT_PRIMITIVES = new Set<AnimationPrimitive>(['topple']);
+
+/**
+ * Стойкие шаги, уже случившиеся к моменту `timeMs`.
+ *
+ * Перемотка гасит всё преходящее — искры и числа от событий, которых
+ * в новом моменте нет. Но упавший боец не эффект, который доиграл,
+ * а положение, в котором он находится: после перемотки в конец он
+ * обязан лежать, даже если анимацию падения никто не смотрел. Обратное
+ * было видно на экране — «Сразу итог» оставлял труп стоять.
+ *
+ * Возвращаются шаги С ИХ НАСТОЯЩИМИ моментами, а не «уже случилось»:
+ * перемотка в середину падения обязана давать середину падения.
+ */
+export function persistentStepsBefore(
+  steps: readonly TimedStep[],
+  timeMs: number,
+): readonly TimedStep[] {
+  const upTo = stepCursorAt(steps, timeMs);
+  const result: TimedStep[] = [];
+  for (let i = 0; i < upTo; i++) {
+    const timed = steps[i];
+    if (timed !== undefined && PERSISTENT_PRIMITIVES.has(timed.step.primitive)) result.push(timed);
+  }
+  return result;
 }
 
 /** Первый шаг, который ещё НЕ сыгран к моменту `timeMs`. Для перемотки. */

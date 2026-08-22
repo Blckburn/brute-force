@@ -2,7 +2,15 @@ import { animations } from '@extramundum/data';
 import type { AnimationSpec } from '@extramundum/shared';
 import { describe, expect, it } from 'vitest';
 
-import { schedule, shownCount, stepCursorAt, timeline, timeOfIndex } from '../schedule.ts';
+import {
+  endOfIndex,
+  persistentStepsBefore,
+  schedule,
+  shownCount,
+  stepCursorAt,
+  timeline,
+  timeOfIndex,
+} from '../schedule.ts';
 
 import { log } from './fixture.ts';
 
@@ -94,10 +102,18 @@ describe('сколько показано к моменту времени', () 
     expect(new Set(forward).size).toBeGreaterThan(10);
   });
 
-  it('перемотка по строке журнала попадает в начало события', () => {
+  it('начало события — это момент, когда оно ЕЩЁ НЕ показано', () => {
     for (const index of [0, 5, 40, log.events.length - 1]) {
-      const at = timeOfIndex(plan, index);
-      expect(shownCount(plan, at)).toBe(index);
+      expect(shownCount(plan, timeOfIndex(plan, index))).toBe(index);
+    }
+  });
+
+  it('перемотка по строке журнала ПОКАЗЫВАЕТ её событие', () => {
+    // Иначе строка, по которой кликнули, пряталась вместе с раскрытым
+    // разбором броска: перемотка в начало события делает его
+    // непоказанным. Поймано глазами на живом экране.
+    for (const index of [0, 5, 40, log.events.length - 1]) {
+      expect(shownCount(plan, endOfIndex(plan, index))).toBe(index + 1);
     }
   });
 });
@@ -135,5 +151,46 @@ describe('плоский список примитивов', () => {
       const own = plan.items[step.index];
       expect(step.atMs).toBe((own?.startMs ?? 0) + step.step.delayMs);
     }
+  });
+});
+
+describe('стойкое переживает перемотку, преходящее — нет', () => {
+  const deathIndex = log.events.findIndex((event) => event.t === 'death');
+
+  it('в выборке есть смерть, и у неё есть стойкий шаг', () => {
+    // Иначе проверки ниже сравнивали бы пустые списки: «после перемотки
+    // ничего не восстановилось» верно и когда восстанавливать нечего.
+    expect(deathIndex).toBeGreaterThan(0);
+    expect(animations.events['death']?.steps.some((step) => step.primitive === 'topple')).toBe(
+      true,
+    );
+  });
+
+  it('после конца боя упавший восстанавливается, до смерти — нет', () => {
+    const beforeDeath = persistentStepsBefore(steps, timeOfIndex(plan, deathIndex));
+    const afterAll = persistentStepsBefore(steps, plan.totalMs);
+
+    expect(beforeDeath).toHaveLength(0);
+    expect(afterAll).toHaveLength(1);
+    expect(afterAll[0]?.event.t).toBe('death');
+    expect(afterAll[0]?.step.primitive).toBe('topple');
+  });
+
+  it('восстановленный шаг несёт СВОЙ момент, а не «уже случилось»', () => {
+    // Перемотка в середину падения обязана давать середину падения.
+    const [restored] = persistentStepsBefore(steps, plan.totalMs);
+    expect(restored).toBeDefined();
+    expect(restored?.atMs).toBe(
+      timeOfIndex(plan, deathIndex) +
+        (animations.events['death']?.steps.find((step) => step.primitive === 'topple')?.delayMs ??
+          -1),
+    );
+  });
+
+  it('преходящие шаги не восстанавливаются', () => {
+    const all = persistentStepsBefore(steps, plan.totalMs);
+    const transient = steps.filter((step) => step.step.primitive !== 'topple');
+    expect(transient.length).toBeGreaterThan(100);
+    for (const step of all) expect(step.step.primitive).toBe('topple');
   });
 });

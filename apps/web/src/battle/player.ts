@@ -8,11 +8,12 @@ import { ParticleField } from '../render/particles.js';
 import type { BattleScene } from '../render/scene.js';
 
 import {
+  endOfIndex,
+  persistentStepsBefore,
   schedule,
   shownCount,
   stepCursorAt,
   timeline,
-  timeOfIndex,
   type Schedule,
   type TimedStep,
 } from './schedule.js';
@@ -148,20 +149,38 @@ export class BattlePlayer {
     this.numbers.setSpeed(speed);
   }
 
-  /** Перемотать к началу события с данным индексом. */
+  /**
+   * Перемотать к моменту, когда событие с данным индексом ЗАКОНЧИЛОСЬ.
+   *
+   * Не к началу: показанным считается уже случившееся, и перемотка
+   * в начало прятала строку журнала, по которой кликнули (см.
+   * `endOfIndex`).
+   */
   seekToEvent(index: number): void {
-    this.seek(timeOfIndex(this.plan, index));
+    this.seek(endOfIndex(this.plan, index));
   }
 
   seek(timeMs: number): void {
     this.clock = Math.max(0, Math.min(timeMs, this.totalMs));
     this.cursor = stepCursorAt(this.steps, this.clock);
-    // Перемотка гасит всё преходящее: искры и числа от событий, которых
+    // Перемотка гасит всё ПРЕХОДЯЩЕЕ: искры и числа от событий, которых
     // в новом моменте ещё (или уже) нет, — это ложь на экране.
     this.particles.clear();
     this.numbers.clear();
     this.fx[0].reset();
     this.fx[1].reset();
+
+    /* А вот СТОЙКОЕ надо восстановить. Упавший боец — это не эффект,
+       который доиграл, это положение, в котором он находится: после
+       перемотки в конец он обязан лежать, даже если анимацию падения
+       никто не смотрел. Обратное было видно на экране — «Сразу итог»
+       оставлял труп стоять.
+
+       Восстанавливается ПОВТОРНЫМ ПРОИГРЫВАНИЕМ стойких шагов
+       с их настоящими моментами: тогда перемотка в середину падения
+       даёт середину падения, а не позу «уже лежит». */
+    for (const timed of persistentStepsBefore(this.steps, this.clock)) this.play(timed);
+
     this.refresh();
   }
 
@@ -215,6 +234,9 @@ export class BattlePlayer {
         return;
       case 'shake':
         fx.startShake(timed.atMs, step.durationMs, step.amount ?? 0);
+        return;
+      case 'topple':
+        fx.startTopple(timed.atMs, step.durationMs, step.amount ?? 0);
         return;
       case 'flash':
         fx.startFlash(timed.atMs, step.durationMs, step.amount ?? 1, step.color ?? 'bone');

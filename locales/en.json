@@ -129,7 +129,7 @@
   "battle.fighter.you": "Exile",
   "battle.fighter.enemy": "Opponent",
   "battle.hp": "{hp} / {max}",
-  "battle.turn": "Turn {tick} · {who}",
+  "battle.turn": "Tick {tick} · {who}",
   "battle.strike": "Strike",
   "battle.strike.crit": "Crit",
   "battle.strike.absorbed": "absorbed",
@@ -145,8 +145,8 @@
   "battle.effects.silent": "no amount",
   "battle.reflected": "Reflected damage",
   "battle.death": "{who} falls",
-  "battle.status.applied": "{status} on {who}",
-  "battle.status.expired": "{status} fades from {who}",
+  "battle.status.applied": "{who}: {status}",
+  "battle.status.expired": "{who}: {status} fades",
   "battle.status.stacks": "×{stacks}",
   "battle.status.duration": "{ticks} t.",
   "battle.status.endless": "until the end",
@@ -186,5 +186,6 @@
   "status.regen": "Regeneration",
   "status.shield": "Shield",
   "status.enrage": "Enrage",
-  "status.chill": "Chill"
+  "status.chill": "Chill",
+  "battle.effects.count": "×{count}"
 }

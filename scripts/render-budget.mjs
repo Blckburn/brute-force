@@ -179,8 +179,30 @@ function bundleSizes() {
     return null;
   }
 
+  /**
+   * Что из этого КРИТИЧЕСКИЙ ПУТЬ, а что подгружается потом.
+   *
+   * Раньше складывалось всё подряд, и с разделением на чанки в M2b
+   * число стало врать: чанки рендера, проигрывателя и эффектов
+   * приходят динамическим импортом при входе на арену, а до первого
+   * кадра поселения браузер их не качает. Считать их критическим путём
+   * значило бы измерять не ту величину — ровно то, за что этот скрипт
+   * ругает бюджеты «на глаз».
+   *
+   * Входной чанк опознаётся по ссылке из index.html, а не по имени:
+   * имена с хешем меняются на каждой сборке.
+   */
+  let entry = '';
+  try {
+    const html = readFileSync(`${DIST}/index.html`, 'utf8');
+    entry = /src="\/assets\/([^"]+\.js)"/.exec(html)?.[1] ?? '';
+  } catch {
+    entry = '';
+  }
+
   let appRaw = 0;
   let appGzip = 0;
+  let asyncGzip = 0;
   let threeRaw = 0;
   let threeGzip = 0;
   let cssGzip = 0;
@@ -195,13 +217,15 @@ function bundleSizes() {
     } else if (name.startsWith('three-')) {
       threeRaw += bytes.length;
       threeGzip += gz;
+    } else if (entry !== '' && name !== entry) {
+      asyncGzip += gz;
     } else {
       appRaw += bytes.length;
       appGzip += gz;
     }
   }
 
-  return { appRaw, appGzip, threeRaw, threeGzip, cssGzip };
+  return { appRaw, appGzip, asyncGzip, threeRaw, threeGzip, cssGzip };
 }
 
 const bundle = bundleSizes();
@@ -212,12 +236,11 @@ const violations = [];
 if (scene.meshes > RENDER_BUDGETS.drawCalls) {
   violations.push(['draw calls', scene.meshes, RENDER_BUDGETS.drawCalls]);
 }
-if (bundle !== null && bundle.appGzip + bundle.cssGzip > RENDER_BUDGETS.bundleGzipBytes) {
-  violations.push([
-    'бандл gzip без three.js',
-    bundle.appGzip + bundle.cssGzip,
-    RENDER_BUDGETS.bundleGzipBytes,
-  ]);
+// Бюджет §3.4 — на ВЕСЬ клиент без three.js, а не только на входной
+// чанк: игрок, дошедший до арены, качает и то и другое.
+const appTotalGzip = bundle === null ? 0 : bundle.appGzip + bundle.asyncGzip + bundle.cssGzip;
+if (bundle !== null && appTotalGzip > RENDER_BUDGETS.bundleGzipBytes) {
+  violations.push(['бандл gzip без three.js', appTotalGzip, RENDER_BUDGETS.bundleGzipBytes]);
 }
 if (bytesPerFrame > 1) {
   violations.push(['байт на кадр', Math.round(bytesPerFrame), 0]);
@@ -244,12 +267,9 @@ if (AS_JSON) {
 
   if (bundle !== null) {
     console.log('');
-    row(
-      'бандл приложения, gzip',
-      kb(bundle.appGzip + bundle.cssGzip),
-      `< ${kb(RENDER_BUDGETS.bundleGzipBytes)}`,
-    );
+    row('бандл приложения, gzip', kb(appTotalGzip), `< ${kb(RENDER_BUDGETS.bundleGzipBytes)}`);
     row('three.js, gzip', kb(bundle.threeGzip), 'отдельным чанком, вне бюджета');
+    row('догружается на арене, gzip', kb(bundle.asyncGzip), 'рендер, эффекты, проигрыватель');
     // Критический путь — то, что браузер качает до первого кадра
     // ПОСЕЛЕНИЯ. Чанк рендера сюда не входит: он приходит динамическим
     // импортом при входе на арену. Это РАЗМЕР, а не время: времени

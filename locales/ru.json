@@ -129,7 +129,7 @@
   "battle.fighter.you": "Изгнанник",
   "battle.fighter.enemy": "Противник",
   "battle.hp": "{hp} / {max}",
-  "battle.turn": "Ход {tick} · {who}",
+  "battle.turn": "Тик {tick} · {who}",
   "battle.strike": "Удар",
   "battle.strike.crit": "Крит",
   "battle.strike.absorbed": "удар поглощён",
@@ -145,8 +145,8 @@
   "battle.effects.silent": "без величины",
   "battle.reflected": "Отражённый урон",
   "battle.death": "{who} падёт",
-  "battle.status.applied": "{status} на {who}",
-  "battle.status.expired": "{status} спадает с {who}",
+  "battle.status.applied": "{who}: {status}",
+  "battle.status.expired": "{who}: {status} спадает",
   "battle.status.stacks": "×{stacks}",
   "battle.status.duration": "{ticks} т.",
   "battle.status.endless": "до конца боя",
@@ -186,5 +186,6 @@
   "status.regen": "Регенерация",
   "status.shield": "Щит",
   "status.enrage": "Бешенство",
-  "status.chill": "Озноб"
+  "status.chill": "Озноб",
+  "battle.effects.count": "×{count}"
 }

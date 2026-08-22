@@ -26,7 +26,9 @@ const root = new URL('../', import.meta.url);
 const OUT = fileURLToPath(new URL('apps/web/src/battle/__tests__/fixtures/battle.json', root));
 const CHECK = process.argv.includes('--check');
 
-const { resolveBattle } = await import(fileURLToPath(new URL('packages/sim/dist/index.js', root)));
+const { resolveBattle, maxHp } = await import(
+  fileURLToPath(new URL('packages/sim/dist/index.js', root))
+);
 const balance = JSON.parse(
   readFileSync(fileURLToPath(new URL('packages/data/balance.json', root)), 'utf8'),
 );
@@ -102,6 +104,16 @@ function findSeed() {
 }
 
 const { seed, log, outcome } = findSeed();
+
+/**
+ * Максимум HP считает ДВИЖОК, как и на сервере.
+ *
+ * Вывести его из лога нельзя: `hpAfter` уже уменьшен на удар. Пробной
+ * странице он нужен для полос здоровья, и брать его оттуда же, откуда
+ * берёт сервер, — единственный способ не завести вторую формулу.
+ */
+const fighterMaxHp = [maxHp(SETUP[0], balance), maxHp(SETUP[1], balance)];
+
 const fixture = {
   $comment: [
     'Эталонный боевой лог. Порождён движком, не написан руками.',
@@ -111,6 +123,7 @@ const fixture = {
   ],
   seed,
   setup: SETUP,
+  maxHp: fighterMaxHp,
   outcome,
   log,
 };

@@ -27,8 +27,17 @@ import { t } from '../i18n.ts';
 
 export type JournalView = {
   readonly element: HTMLElement;
-  /** Показать первые `shown` событий. Остальные ещё не случились. */
-  reveal(shown: number): void;
+  /**
+   * Показать первые `shown` событий. Остальные ещё не случились.
+   *
+   * `follow` — прокручивать ли к последней раскрытой строке. Пока бой
+   * идёт, это нужно: иначе журнал «работает», а игрок смотрит на начало
+   * боя, пока идёт конец. Но на паузе прокрутка вредна и была багом:
+   * клик по строке ставит бой на паузу и перематывает, перемотка меняет
+   * показанное, показанное дёргало прокрутку — и разбор броска уезжал
+   * из виду ровно в тот момент, когда его открыли.
+   */
+  reveal(shown: number, follow: boolean): void;
 };
 
 /** Порядок множителей — порядок шагов пайплайна урона (GDD §4.2). */
@@ -92,7 +101,7 @@ export function renderJournal(log: BattleLog, onSeek: (index: number) => void): 
 
   return {
     element,
-    reveal(shown: number): void {
+    reveal(shown: number, follow: boolean): void {
       if (shown === revealed) return;
       const from = Math.min(revealed, shown);
       const to = Math.max(revealed, shown);
@@ -105,6 +114,7 @@ export function renderJournal(log: BattleLog, onSeek: (index: number) => void): 
       }
       revealed = shown;
 
+      if (!follow) return;
       // Держать последнюю раскрытую строку на виду. Иначе журнал
       // «работает», но игрок смотрит на начало боя, пока идёт конец.
       const last = lastVisible(entries, rows, shown);
@@ -159,6 +169,11 @@ function renderRow(entry: JournalEntry, onSeek: (index: number) => void): HTMLEl
 function renderHead(entry: JournalEntry): (string | Node)[] {
   switch (entry.kind) {
     case 'turn':
+      // Число — ТИК ДВИЖКА, а не порядковый номер хода, и подписано
+      // соответственно. Боец действует раз в ~10 тиков (GDD §4.1),
+      // поэтому «Ход 159» врал бы: ходов к этому моменту было
+      // полтора десятка. Свою нумерацию клиент не заводит: она была бы
+      // величиной, которой нет в логе.
       return [
         el('span', { class: 'journal__tick' }, [
           t('battle.turn', { tick: entry.tick, who: fighterName(entry.actor) }),
@@ -208,7 +223,10 @@ function renderHead(entry: JournalEntry): (string | Node)[] {
             : t('battle.effects.total', { amount: entry.total }),
         ]),
         el('span', { class: 'journal__count' }, [
-          t('battle.status.stacks', { stacks: entry.entries.length }),
+          // Это ЧИСЛО ТИКОВ в свёрнутой строке, а не стаки статуса:
+          // ключ у него свой, чтобы одинаковый на вид «×2» не начал
+          // однажды означать в двух местах разное.
+          t('battle.effects.count', { count: entry.entries.length }),
         ]),
       ];
 
@@ -218,6 +236,9 @@ function renderHead(entry: JournalEntry): (string | Node)[] {
         case 'status_apply':
           return [
             el('span', { class: 'journal__what' }, [
+              // Порядок «кто: что» выбран не ради красоты: «Яд на {кто}»
+              // требует винительного падежа, а подстановка его не даёт —
+              // получалось «Яд на Противник».
               t('battle.status.applied', {
                 status: statusName(event.status),
                 who: fighterName(event.target),

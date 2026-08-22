@@ -218,6 +218,12 @@ export const ANIMATION_PRIMITIVES = [
   'number',
   /** Тряска: короткое смещение цели от удара. */
   'shake',
+  /**
+   * Падение: поворот бойца вокруг ступней. Единственный примитив,
+   * который НЕ возвращается в исходное положение — иначе убитый
+   * поднимался бы обратно.
+   */
+  'topple',
 ] as const;
 export const animationPrimitiveSchema = z.enum(ANIMATION_PRIMITIVES);
 export type AnimationPrimitive = z.infer<typeof animationPrimitiveSchema>;
@@ -235,7 +241,7 @@ export const animationStepSchema = z.object({
   durationMs: z.number().positive(),
   /** Ключ цвета из палитры. */
   color: z.string().min(1).optional(),
-  /** Амплитуда: метры для lunge и shake, множитель для остальных. */
+  /** Амплитуда: метры для lunge и shake, радианы для topple, множитель для остальных. */
   amount: z.number().optional(),
   /** Число частиц для burst. */
   count: z.int().min(1).max(64).optional(),

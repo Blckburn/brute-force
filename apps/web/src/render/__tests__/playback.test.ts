@@ -226,6 +226,31 @@ describe('перемотка не оставляет следов будущег
     scene.dispose();
   });
 
+  it('упавший остаётся лежать, но перемотка его поднимает', () => {
+    // Падение — единственный эффект, который НЕ возвращается к покою:
+    // обычная развёртка гасит его после конца, и убитый вставал бы.
+    // А перемотка назад обязана его отменять: в середине боя он жив.
+    const scene = battleScene();
+    const rig = scene.built.fighters[0];
+    expect(rig.root.rotation.z).toBe(0);
+
+    scene.fx[0].startTopple(1000, 700, 1.5);
+    scene.fx[0].update(1350);
+    const midway = rig.root.rotation.z;
+    expect(Math.abs(midway)).toBeGreaterThan(0.5);
+
+    // Далеко ПОСЛЕ конца: остаётся лежать, а не поднимается.
+    scene.fx[0].update(9000);
+    expect(Math.abs(rig.root.rotation.z)).toBeGreaterThan(Math.abs(midway));
+    expect(Math.abs(rig.root.rotation.z)).toBeCloseTo(1.5, 5);
+
+    // Момент ДО падения: боец стоит.
+    scene.fx[0].update(900);
+    expect(rig.root.rotation.z).toBe(0);
+
+    scene.dispose();
+  });
+
   it('часы, ушедшие назад, гасят эффект', () => {
     const scene = battleScene();
     const rig = scene.built.fighters[1];
